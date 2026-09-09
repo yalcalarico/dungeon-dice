@@ -44,6 +44,7 @@ function App() {
   const [autoD20, setAutoD20] = useState(false)
   const [autoD6, setAutoD6] = useState(false)
   const [performanceSnapshot, setPerformanceSnapshot] = useState<ScenePerformanceSnapshot | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'error' | 'idle'>('idle')
   const rollTimerRef = useRef<number | null>(null)
   const combatTimerRef = useRef<number | null>(null)
   const turnTimerRef = useRef<number | null>(null)
@@ -83,6 +84,12 @@ function App() {
   }
 
   const startNewCharacter = () => { setCreationOpen(true); setMenuOpen(false); setCreationError('') }
+
+  const saveGame = () => {
+    if (!mvp || !character) return
+    const saved = saveMvpSession(mvp) && saveCharacter(mvp.character)
+    setSaveStatus(saved ? 'saved' : 'error')
+  }
 
   const performMvpAction = (action: MvpAction) => {
     if (!mvp) return
@@ -438,9 +445,9 @@ function App() {
        </section>
 
        <section className="inventory-bar" aria-label="Inventario">
-         <span className="inventory-label">INVENTARIO</span>
+          <span className="inventory-label">INVENTARIO <small>{mvp?.inventory.reduce((total, item) => total + item.quantity, 0) ?? 0}/{mvp?.inventoryCapacity ?? 12}</small></span>
          <div className="inventory-slots">{mvp?.inventory.length ? mvp.inventory.map((item) => <button key={item.id} type="button" className={`inventory-item${inventoryMenuId === item.id ? ' selected' : ''}`} onClick={() => setInventoryMenuId(inventoryMenuId === item.id ? null : item.id)}><b>{item.id === 'moon-potion' ? '✦' : '◇'}</b><span>{item.label}</span><strong>{item.quantity}</strong></button>) : <span className="inventory-empty">Tu mochila está vacía</span>}</div>
-         {inventoryMenuId && mvp && <div className="inventory-menu" role="menu"><strong>{mvp.inventory.find((item) => item.id === inventoryMenuId)?.label}</strong>{inventoryMenuId === 'moon-potion' && <button type="button" onClick={() => performMvpAction({ type: 'use-potion' })} disabled={mvp.encounter.status === 'active'}>Usar</button>}<button type="button" onClick={() => performMvpAction({ type: 'drop-item', itemId: inventoryMenuId })}>Dejar</button></div>}
+          {inventoryMenuId && mvp && <div className="inventory-menu" role="menu"><strong>{mvp.inventory.find((item) => item.id === inventoryMenuId)?.label}</strong>{inventoryMenuId === 'moon-potion' && <button type="button" onClick={() => performMvpAction({ type: 'use-potion' })} disabled={mvp.encounter.status === 'active'}>Usar</button>}{mvp.inventory.find((item) => item.id === inventoryMenuId)?.equippable === true && <button type="button" onClick={() => performMvpAction({ type: 'equip-item', itemId: inventoryMenuId })}>Equipar</button>}<button type="button" onClick={() => performMvpAction({ type: 'drop-item', itemId: inventoryMenuId })}>Dejar</button></div>}
        </section>
 
       {historyOpen && <aside className="history-sidebar" aria-label="Historial completo del viaje">
@@ -457,7 +464,9 @@ function App() {
            <li><b>RUEDA</b><span>Acercar o alejar</span></li>
          </ul>
          <button className="reset-game-button" type="button" onClick={startNewCharacter}>Crear otro personaje</button>
-         <button className="reset-game-button" type="button" onClick={resetGame}>Reiniciar partida</button>
+          <button className="reset-game-button" type="button" onClick={saveGame}>Guardar partida</button>
+          <small className={`save-status ${saveStatus}`}>{saveStatus === 'saved' ? 'Guardado local confirmado' : saveStatus === 'error' ? 'No se pudo guardar esta partida' : 'Sin guardado manual'}</small>
+          <button className="reset-game-button" type="button" onClick={resetGame}>Reiniciar partida</button>
        </aside>}
 
        {outcomeVisible && <div className={`outcome-banner ${outcomeType}`} role="status" onClick={() => setDismissedOutcomeKey(outcomeKey)}><button type="button" className="outcome-close" aria-label="Cerrar mensaje" onClick={(event) => { event.stopPropagation(); setDismissedOutcomeKey(outcomeKey) }}>×</button><span>{outcomeType === 'victory' ? 'VICTORIA' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'HAS MUERTO' : 'LA CRIPTA TE RECHAZA' : 'PRUEBA SUPERADA'}</span><p>{outcomeType === 'victory' ? 'Has completado todos los mapas de la campaña.' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'Tu vida llegó a cero. Puedes reintentar el encuentro desde el último punto seguro.' : 'La pista se ha perdido, pero esta historia todavía puede crecer.' : 'La tirada ha superado la dificultad. El altar revela un nuevo camino.'}</p></div>}

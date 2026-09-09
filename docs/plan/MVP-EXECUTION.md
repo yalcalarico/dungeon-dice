@@ -150,10 +150,11 @@ Este documento es el checklist operativo para convertir el demo actual en el MVP
 Se implementaron los siguientes sub-slices verificables sin declarar completos sus slices de producto:
 
 - [x] **S6:** validar y normalizar sesiones MVP al cargar, migrar campos antiguos del encuentro y conservar el guardado válido si falla una escritura.
-- [x] **S7:** evitar que un check resuelto vuelva a aplicar efectos, coste u objetivos; conservar zonas visitadas y contexto de transición.
-- [x] **S8:** hacer idempotentes los milestones de XP, nivel, inventario y recompensas del personaje.
-- [x] **S9:** mantener cantidades de inventario coherentes entre sesión y personaje, proteger objetos de misión y hacer transaccionales uso/descarte.
-- [x] **S10:** añadir diálogo de Iria dependiente de zona y confianza, con progresión limitada y persistente.
+- [x] **S6:** validar y normalizar sesiones MVP al cargar, migrar campos antiguos del encuentro, conservar el guardado válido si falla una escritura y añadir guardado manual.
+- [x] **S7:** evitar que un check resuelto vuelva a aplicar efectos, conservar zonas visitadas y añadir evaluador genérico de requisitos/efectos.
+- [x] **S8:** usar una tabla versionada de XP, hacer idempotentes los milestones y sincronizar nivel/recompensas del personaje.
+- [x] **S9:** mantener cantidades de inventario coherentes, mostrar capacidad, proteger objetos de misión y añadir equipamiento base.
+- [x] **S10:** añadir diálogo de Iria como datos dependientes de zona y confianza, con progresión limitada y persistente.
 
 S6-S10 siguen parciales: faltan guardado manual y checkpoints, runtime declarativo general, tabla de progresión configurable, equipamiento y diálogos definidos desde contenido.
 

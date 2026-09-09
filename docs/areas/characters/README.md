@@ -171,6 +171,7 @@ El personaje no debe conocer detalles de la cripta. El nivel tampoco debe mutar 
 - [ ] Generalizar costes de recursos.
 - [x] Crear eventos de recompensa de experiencia.
 - [x] Crear milestones configurables por nivel.
+- [x] Añadir tabla versionada de progresión y resolución idempotente de milestones.
 - [ ] Crear tabla de experiencia y niveles.
 - [x] Implementar guardado/carga local.
 - [ ] Añadir migraciones de schema.

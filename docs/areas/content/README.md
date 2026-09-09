@@ -123,6 +123,7 @@ La futura herramienta debe permitir:
 - [ ] Extraer toda la geometría y reglas de altar, antorchas y puerta a configuración JSON consumida por runtime.
 - [x] Crear loader y validador de configuración.
 - [x] Consumir desde runtime labels, keywords, dificultad y coste de reintento.
+- [x] Añadir evaluador base de requisitos y efectos sin dependencia de React o Three.js.
 - [ ] Crear catálogo de tipos visuales permitidos.
 - [ ] Crear sistema genérico de objetos interactivos.
 - [ ] Crear evaluador genérico de requisitos.

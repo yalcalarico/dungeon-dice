@@ -1,5 +1,5 @@
 import { validateCharacter, type Character } from '../characters/character'
-import type { InventoryItem, MvpSession } from './campaign'
+import { INVENTORY_CAPACITY, type InventoryItem, type MvpSession } from './campaign'
 
 const CHARACTER_KEY = 'dungeon-dice:characters:v1'
 const SESSION_KEY = 'dungeon-dice:mvp-session:v1'
@@ -8,20 +8,20 @@ export function loadCharacters(): Character[] {
   try { const value: unknown = JSON.parse(localStorage.getItem(CHARACTER_KEY) ?? '[]'); return Array.isArray(value) ? value.filter(validateCharacter) : [] } catch { return [] }
 }
 
-export function saveCharacter(character: Character): void {
-  if (!validateCharacter(character)) return
+export function saveCharacter(character: Character): boolean {
+  if (!validateCharacter(character)) return false
   const characters = loadCharacters().filter((candidate) => candidate.id !== character.id)
-  try { localStorage.setItem(CHARACTER_KEY, JSON.stringify([...characters, character])) } catch { /* Storage can be unavailable or full. Keep the previous snapshot. */ }
+  try { localStorage.setItem(CHARACTER_KEY, JSON.stringify([...characters, character])); return true } catch { return false }
 }
 
 export function loadMvpSession(characterId: string): MvpSession | null {
   try { return normalizeMvpSession(JSON.parse(localStorage.getItem(`${SESSION_KEY}:${characterId}`) ?? 'null'), characterId) } catch { return null }
 }
 
-export function saveMvpSession(session: MvpSession): void {
+export function saveMvpSession(session: MvpSession): boolean {
   const normalized = normalizeMvpSession(session, session.character.id)
-  if (!normalized) return
-  try { localStorage.setItem(`${SESSION_KEY}:${session.character.id}`, JSON.stringify(normalized)) } catch { /* Storage can be unavailable or full. Keep the previous snapshot. */ }
+  if (!normalized) return false
+  try { localStorage.setItem(`${SESSION_KEY}:${session.character.id}`, JSON.stringify(normalized)); return true } catch { return false }
 }
 
 export function validateMvpSession(value: unknown, characterId?: string): value is MvpSession {
@@ -53,6 +53,8 @@ function normalizeMvpSession(value: unknown, characterId?: string): MvpSession |
     visitedZoneIds: [...new Set(value.visitedZoneIds)],
     npcTrust: Math.max(0, Math.min(2, Math.floor(npcTrust))),
     inventory,
+    equippedItemId: value.equippedItemId === 'moon-potion' || value.equippedItemId === 'ash-key' ? value.equippedItemId : null,
+    inventoryCapacity: positiveNumber(value.inventoryCapacity, INVENTORY_CAPACITY),
     experience: normalizedExperience,
     lastRoll: finiteOrNull(value.lastRoll),
     lastDie: finiteOrNull(value.lastDie ?? value.lastRoll),
@@ -84,7 +86,7 @@ function normalizeInventory(value: unknown): InventoryItem[] | null {
     const kind = candidate.kind
     const existing = items.get(id)
     if (existing) existing.quantity += quantity
-    else items.set(id, { id, label, quantity, kind })
+    else items.set(id, { id, label, quantity, kind, equippable: candidate.equippable === true })
   }
   return [...items.values()]
 }
