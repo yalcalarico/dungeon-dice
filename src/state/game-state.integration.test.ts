@@ -84,4 +84,16 @@ describe('game flow integration', () => {
     expect(attempted.flags.altarInvestigated).toBe(false)
     expect(attempted.entries.at(-1)?.text).toContain('objeto correcto')
   })
+
+  it('does not apply a resolved check twice', () => {
+    const initial = createInitialGameState()
+    const pending = transitionGameState(initial, { type: 'choose-action', actionId: 'inspect-altar', targetId: 'altar' }, successfulRoll)
+    const resolved = transitionGameState(pending, { type: 'roll-dice' }, successfulRoll)
+    const repeated = transitionGameState(resolved, { type: 'roll-dice' }, failedRoll)
+
+    expect(repeated.flags).toEqual(resolved.flags)
+    expect(repeated.objectives).toEqual(resolved.objectives)
+    expect(repeated.player).toEqual(resolved.player)
+    expect(repeated.pendingCheck).toBeNull()
+  })
 })

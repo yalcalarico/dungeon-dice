@@ -52,12 +52,12 @@ Evitar regresiones en la lógica jugable, el ciclo de vida de Three.js y la expe
 - [x] Añadir Vitest y tests de dados, interacción, configuración, estado y calidad.
 - [x] Añadir tests del tracker de rendimiento y de resolución narrativa directa.
 - [x] Integrar la sesión real en `App` sin romper las transiciones existentes.
-- [ ] Cubrir creación/carga de personajes, recursos HP/MP y recompensas de experiencia cuando se implementen.
-- [ ] Probar la ruta completa altar -> antorcha -> puerta en navegador.
-- [ ] Medir el coste de la lluvia con el overlay de rendimiento.
-- [ ] Verificar banner de éxito verde y cierre de outcomes.
-- [ ] Verificar checklist de objetivos en estados inicial, bloqueado y completado.
-- [ ] Verificar que un fallo del altar no bloquea antorcha ni salida.
+- [x] Cubrir creación/carga de personajes, recursos HP/MP y recompensas de experiencia.
+- [x] Probar la ruta completa altar -> antorcha -> puerta en navegador.
+- [x] Medir visualmente el coste de la lluvia con el overlay de rendimiento.
+- [x] Verificar banner de éxito verde y cierre de outcomes.
+- [x] Verificar checklist de objetivos en estados inicial, bloqueado y completado.
+- [x] Verificar que un fallo del altar no bloquea antorcha ni salida.
 
 ## Criterios de aceptación
 

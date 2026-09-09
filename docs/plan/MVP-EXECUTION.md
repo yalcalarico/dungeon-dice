@@ -142,7 +142,20 @@ Este documento es el checklist operativo para convertir el demo actual en el MVP
 - [ ] S3. Mapa ampliado y transiciones (fundación implementada).
 - [ ] S4. Authoring mínimo de campaña (fundación implementada).
 - [ ] S5. Personajes (fundación implementada).
-- [ ] S6-S15. Pendientes.
+- [ ] S6-S10. Parciales; ver el avance detallado más abajo.
+- [ ] S11-S15. Pendientes.
+
+## Avance de slices posteriores
+
+Se implementaron los siguientes sub-slices verificables sin declarar completos sus slices de producto:
+
+- [x] **S6:** validar y normalizar sesiones MVP al cargar, migrar campos antiguos del encuentro y conservar el guardado válido si falla una escritura.
+- [x] **S7:** evitar que un check resuelto vuelva a aplicar efectos, coste u objetivos; conservar zonas visitadas y contexto de transición.
+- [x] **S8:** hacer idempotentes los milestones de XP, nivel, inventario y recompensas del personaje.
+- [x] **S9:** mantener cantidades de inventario coherentes entre sesión y personaje, proteger objetos de misión y hacer transaccionales uso/descarte.
+- [x] **S10:** añadir diálogo de Iria dependiente de zona y confianza, con progresión limitada y persistente.
+
+S6-S10 siguen parciales: faltan guardado manual y checkpoints, runtime declarativo general, tabla de progresión configurable, equipamiento y diálogos definidos desde contenido.
 
 ## Integración visual MVP - estado de esta pasada
 

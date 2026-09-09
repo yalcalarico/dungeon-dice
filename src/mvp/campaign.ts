@@ -32,12 +32,13 @@ export type MvpAction =
   | { type: 'reset-encounter' }
 
 export function createMvpSession(character: Character): MvpSession {
+  const inventory = inventoryFromCharacter(character.inventory)
   return {
     character,
     zoneId: 'crypt-of-lunargenta',
     visitedZoneIds: ['crypt-of-lunargenta'],
     npcTrust: 0,
-    inventory: [],
+    inventory,
     experience: character.experience,
     lastRoll: null,
     lastDie: null,
@@ -54,7 +55,12 @@ export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSessi
     if (session.zoneId === action.zoneId) return session
     return append({ ...session, zoneId: action.zoneId, visitedZoneIds: session.visitedZoneIds.includes(action.zoneId) ? session.visitedZoneIds : [...session.visitedZoneIds, action.zoneId] }, `Llegas a ${action.zoneId === 'ashen-courtyard' ? 'el Patio de Ceniza' : 'la Cripta de Lunargenta'}.`)
   }
-  if (action.type === 'talk-npc') return append({ ...session, npcTrust: Math.min(2, session.npcTrust + 1) }, session.npcTrust === 0 ? 'Iria, la guardiana, te ofrece una ruta segura hacia el patio.' : 'Iria confía en ti y te entrega una pista sobre la reliquia.')
+  if (action.type === 'talk-npc') {
+    if (session.zoneId !== 'ashen-courtyard') return append(session, 'Iria no está aquí.')
+    if (session.npcTrust === 0) return append({ ...session, npcTrust: 1 }, 'Iria, la guardiana, te ofrece una ruta segura hacia el patio.')
+    if (session.npcTrust === 1) return append({ ...session, npcTrust: 2 }, 'Iria confía en ti y te entrega una pista sobre la reliquia.')
+    return append(session, 'Iria asiente. Ya te ha contado todo lo que sabe.')
+  }
   if (action.type === 'inspect-relic') return milestone(session, 'relic-discovered', 25, { id: 'ash-key', label: 'Llave de ceniza', quantity: 1, kind: 'quest' }, 'La reliquia revela un fragmento de la historia de Lunargenta.')
   if (action.type === 'start-encounter') {
     if (session.zoneId !== 'ashen-courtyard' || session.encounter.status !== 'idle') return session
@@ -69,7 +75,7 @@ export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSessi
     const potion = session.inventory.find((item) => item.id === 'moon-potion' && item.quantity > 0)
     if (!potion || session.character.resources.hp >= session.character.resources.maxHp) return append(session, 'No puedes usar una poción ahora.')
     const inventory = session.inventory.map((item) => item.id === 'moon-potion' ? { ...item, quantity: item.quantity - 1 } : item).filter((item) => item.quantity > 0)
-    const character = { ...session.character, resources: { ...session.character.resources, hp: Math.min(session.character.resources.maxHp, session.character.resources.hp + 8) } }
+    const character = syncCharacterInventory({ ...session.character, resources: { ...session.character.resources, hp: Math.min(session.character.resources.maxHp, session.character.resources.hp + 8) } }, inventory)
     return append({ ...session, character, inventory }, 'Bebes una poción lunar y recuperas 8 HP.')
   }
   if (action.type === 'drop-item') {
@@ -78,7 +84,7 @@ export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSessi
     if (item.kind === 'quest') return append(session, `${item.label} es necesaria para la campaña y no puedes dejarla.`)
     const inventory = session.inventory.map((candidate) => candidate.id === item.id ? { ...candidate, quantity: candidate.quantity - 1 } : candidate).filter((candidate) => candidate.quantity > 0)
     const droppedIndex = session.character.inventory.indexOf(item.id)
-    const character = { ...session.character, inventory: droppedIndex < 0 ? session.character.inventory : session.character.inventory.filter((_itemId, index) => index !== droppedIndex) }
+    const character = syncCharacterInventory({ ...session.character, inventory: droppedIndex < 0 ? session.character.inventory : session.character.inventory.filter((_itemId, index) => index !== droppedIndex) }, inventory)
     return append({ ...session, inventory, character }, `Dejas una unidad de ${item.label}.`)
   }
   if (action.type === 'attack') {
@@ -104,7 +110,33 @@ function milestone(session: MvpSession, id: string, experience: number, item: In
   if (session.completedMilestones.includes(id)) return append(session, message)
   const total = session.experience + experience
   const level = total >= 50 ? 2 : session.level
-  return append({ ...session, experience: total, level, inventory: [...session.inventory, item], completedMilestones: [...session.completedMilestones, id], character: { ...session.character, experience: total, level, inventory: [...session.character.inventory, item.id], completedMilestones: [...session.character.completedMilestones, id] } }, `${message} +${experience} XP.`)
+  const inventory = addInventoryItem(session.inventory, item)
+  const character = syncCharacterInventory({ ...session.character, experience: total, level, completedMilestones: unique([...session.character.completedMilestones, id]) }, inventory)
+  return append({ ...session, experience: total, level, inventory, completedMilestones: unique([...session.completedMilestones, id]), character }, `${message} +${experience} XP.`)
 }
 
 function append(session: MvpSession, message: string): MvpSession { return { ...session, log: [...session.log, message].slice(-12) } }
+
+function addInventoryItem(inventory: InventoryItem[], item: InventoryItem): InventoryItem[] {
+  const existing = inventory.find((candidate) => candidate.id === item.id)
+  if (existing) return inventory.map((candidate) => candidate.id === item.id ? { ...candidate, quantity: candidate.quantity + item.quantity } : candidate)
+  return [...inventory, item]
+}
+
+function inventoryFromCharacter(ids: string[]): InventoryItem[] {
+  const inventory: InventoryItem[] = []
+  for (const id of ids) {
+    const item = id === 'moon-potion' ? { id: 'moon-potion' as const, label: 'Poción lunar', quantity: 1, kind: 'consumable' as const } : id === 'ash-key' ? { id: 'ash-key' as const, label: 'Llave de ceniza', quantity: 1, kind: 'quest' as const } : null
+    if (!item) continue
+    const existing = inventory.find((candidate) => candidate.id === item.id)
+    if (existing) existing.quantity += 1
+    else inventory.push(item)
+  }
+  return inventory
+}
+
+function syncCharacterInventory(character: Character, inventory: InventoryItem[]): Character {
+  return { ...character, inventory: inventory.flatMap((item) => Array.from({ length: Math.max(0, item.quantity) }, () => item.id)) }
+}
+
+function unique(values: string[]): string[] { return [...new Set(values)] }
