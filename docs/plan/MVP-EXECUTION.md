@@ -156,6 +156,7 @@ Se implementaron los siguientes sub-slices verificables sin declarar completos s
 - [x] **S9:** mantener cantidades de inventario coherentes, mostrar capacidad, proteger objetos de misión y añadir equipamiento base.
 - [x] **S10:** añadir diálogo de Iria como datos dependientes de zona y confianza, con progresión limitada y persistente.
 - [x] **S11:** añadir retirada explícita sin recompensas y una decisión de ruta persistente alrededor de Iria.
+- [x] **S12:** hacer verificables las dos rutas: `relic` conserva la llave de ceniza y `direct` bloquea la reliquia y entrega un sello de brasa tras la victoria.
 
 S6-S10 siguen parciales: faltan guardado manual y checkpoints, runtime declarativo general, tabla de progresión configurable, equipamiento y diálogos definidos desde contenido.
 

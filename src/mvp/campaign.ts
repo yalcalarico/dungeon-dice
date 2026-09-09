@@ -3,7 +3,7 @@ import { attributeModifier } from '../characters/character'
 import { getDialogueNode, iriaDialogue } from '../content/dialogue'
 import { awardMilestone, findMilestone } from '../progression/progression'
 
-export type InventoryItem = { id: 'moon-potion' | 'ash-key'; label: string; quantity: number; kind: 'consumable' | 'quest'; equippable?: boolean }
+export type InventoryItem = { id: 'moon-potion' | 'ash-key' | 'ember-seal'; label: string; quantity: number; kind: 'consumable' | 'quest'; equippable?: boolean }
 export type EncounterStatus = 'idle' | 'active' | 'victory' | 'defeat'
 export type RouteChoice = 'relic' | 'direct'
 export const INVENTORY_CAPACITY = 12
@@ -99,7 +99,10 @@ function applyMvpActionInternal(session: MvpSession, action: MvpAction): MvpSess
     if (session.zoneId !== 'ashen-courtyard' || session.npcTrust < 1 || session.routeChoice !== null) return session
     return append({ ...session, routeChoice: action.route }, action.route === 'relic' ? 'Decides seguir la pista de Iria hacia la reliquia.' : 'Decides avanzar directamente hacia el centinela.')
   }
-  if (action.type === 'inspect-relic') return milestone(session, 'relic-discovered', 25, { id: 'ash-key', label: 'Llave de ceniza', quantity: 1, kind: 'quest', equippable: true }, 'La reliquia revela un fragmento de la historia de Lunargenta.')
+  if (action.type === 'inspect-relic') {
+    if (session.routeChoice === 'direct') return append(session, 'La ruta directa deja la reliquia fuera de tu alcance.')
+    return milestone(session, 'relic-discovered', 25, { id: 'ash-key', label: 'Llave de ceniza', quantity: 1, kind: 'quest', equippable: true }, 'La reliquia revela un fragmento de la historia de Lunargenta.')
+  }
   if (action.type === 'start-encounter') {
     if (session.zoneId !== 'ashen-courtyard' || session.encounter.status !== 'idle') return session
     return append({ ...session, encounter: { status: 'active', enemyHp: 18, enemyMaxHp: 18, turns: 0, awaitingRoll: true, turn: 'player', pendingEnemyDamage: 0 } }, 'El centinela de ceniza despierta. Lanza el D20 para comenzar tu turno.')
@@ -159,7 +162,12 @@ function applyMvpActionInternal(session: MvpSession, action: MvpAction): MvpSess
   const damageDie = normalizeDamageRoll(action.damageRoll ?? 4)
   const damage = hit ? calculateDamage(damageDie, modifier) : 0
   const enemyHp = Math.max(0, session.encounter.enemyHp - damage)
-  if (enemyHp === 0) return milestone({ ...session, lastRoll: action.roll, lastDie: action.die ?? action.roll, lastModifier: action.modifier ?? 0, encounter: { ...session.encounter, status: 'victory', enemyHp: 0, turns: session.encounter.turns + 1, awaitingRoll: false, pendingEnemyDamage: 0 } }, 'sentinel-defeated', 40, { id: 'moon-potion', label: 'Poción lunar', quantity: 2, kind: 'consumable' }, hit ? 'Tu golpe rompe la armadura del centinela.' : 'El centinela cae después de tu último intercambio.')
+   if (enemyHp === 0) {
+     const victory = milestone({ ...session, lastRoll: action.roll, lastDie: action.die ?? action.roll, lastModifier: action.modifier ?? 0, encounter: { ...session.encounter, status: 'victory', enemyHp: 0, turns: session.encounter.turns + 1, awaitingRoll: false, pendingEnemyDamage: 0 } }, 'sentinel-defeated', 40, { id: 'moon-potion', label: 'Poción lunar', quantity: 2, kind: 'consumable' }, hit ? 'Tu golpe rompe la armadura del centinela.' : 'El centinela cae después de tu último intercambio.')
+     return session.routeChoice === 'direct'
+       ? milestone(victory, 'direct-route-reward', 20, { id: 'ember-seal', label: 'Sello de brasa', quantity: 1, kind: 'quest' }, 'El centinela reconoce tu atajo y deja un sello de brasa.')
+       : victory
+   }
   const modifierText = formatModifier(modifier)
   const attackText = `Ataque: d20 ${die} ${modifierText} = ${action.roll} contra CA ${SENTINEL_ARMOR_CLASS}.`
   return append({ ...session, lastRoll: action.roll, lastDie: die, lastModifier: modifier, encounter: { ...session.encounter, enemyHp, turns: session.encounter.turns + 1, awaitingRoll: false, turn: 'enemy', pendingEnemyDamage: 0 } }, hit ? `${attackText} Causas ${damage} de daño (1D6: ${damageDie} ${formatModifier(modifier)}).` : `${attackText} El centinela esquiva y no causas daño.`)
@@ -194,7 +202,7 @@ function addInventoryItem(inventory: InventoryItem[], item: InventoryItem): Inve
 export function inventoryFromCharacter(ids: string[]): InventoryItem[] {
   const inventory: InventoryItem[] = []
   for (const id of ids) {
-    const item = id === 'moon-potion' ? { id: 'moon-potion' as const, label: 'Poción lunar', quantity: 1, kind: 'consumable' as const } : id === 'ash-key' ? { id: 'ash-key' as const, label: 'Llave de ceniza', quantity: 1, kind: 'quest' as const, equippable: true } : null
+    const item = id === 'moon-potion' ? { id: 'moon-potion' as const, label: 'Poción lunar', quantity: 1, kind: 'consumable' as const } : id === 'ash-key' ? { id: 'ash-key' as const, label: 'Llave de ceniza', quantity: 1, kind: 'quest' as const, equippable: true } : id === 'ember-seal' ? { id: 'ember-seal' as const, label: 'Sello de brasa', quantity: 1, kind: 'quest' as const } : null
     if (!item) continue
     const existing = inventory.find((candidate) => candidate.id === item.id)
     if (existing) existing.quantity += 1

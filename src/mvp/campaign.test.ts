@@ -60,6 +60,44 @@ describe('MVP campaign rules', () => {
     expect(retreated.experience).toBe(0)
   })
 
+  it('keeps the relic route reward and does not duplicate it after victory', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'talk-npc' })
+    session = applyMvpAction(session, { type: 'choose-route', route: 'relic' })
+    session = applyMvpAction(session, { type: 'inspect-relic' })
+    const inspected = applyMvpAction(session, { type: 'inspect-relic' })
+
+    expect(inspected.routeChoice).toBe('relic')
+    expect(inspected.experience).toBe(25)
+    expect(inspected.inventory.find((item) => item.id === 'ash-key')?.quantity).toBe(1)
+  })
+
+  it('blocks the relic on the direct route and grants its alternative reward on victory', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'talk-npc' })
+    session = applyMvpAction(session, { type: 'choose-route', route: 'direct' })
+    const blocked = applyMvpAction(session, { type: 'inspect-relic' })
+    expect(blocked.experience).toBe(0)
+    expect(blocked.inventory.find((item) => item.id === 'ash-key')).toBeUndefined()
+
+    session = applyMvpAction(blocked, { type: 'start-encounter' })
+    for (let turn = 0; turn < 4; turn++) {
+      session = applyMvpAction(session, { type: 'attack' })
+      session = applyMvpAction(session, { type: 'resolve-attack', roll: 20 })
+      if (session.encounter.turn === 'enemy') session = applyMvpAction(session, { type: 'resolve-enemy-turn' })
+    }
+
+    expect(session.routeChoice).toBe('direct')
+    expect(session.encounter.status).toBe('victory')
+    expect(session.experience).toBe(60)
+    expect(session.inventory.find((item) => item.id === 'ember-seal')?.quantity).toBe(1)
+    expect(session.inventory.find((item) => item.id === 'ash-key')).toBeUndefined()
+
+    const repeated = applyMvpAction(session, { type: 'resolve-attack', roll: 20 })
+    expect(repeated.experience).toBe(60)
+    expect(repeated.inventory.find((item) => item.id === 'ember-seal')?.quantity).toBe(1)
+  })
+
   it('keeps inventory quantities and protects quest items', () => {
     let session = applyMvpAction(createMvpSession(character), { type: 'inspect-relic' })
     const blocked = applyMvpAction(session, { type: 'drop-item', itemId: 'ash-key' })

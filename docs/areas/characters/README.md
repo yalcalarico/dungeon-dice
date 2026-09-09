@@ -188,3 +188,16 @@ El personaje no debe conocer detalles de la cripta. El nivel tampoco debe mutar 
 - La progresión queda guardada y puede recuperarse.
 - Un personaje inválido no puede iniciar un nivel.
 - La lógica puede probarse sin Three.js ni navegador.
+
+## Criterio de balance inicial (S13)
+
+La primera pasada compara cada arquetipo con reglas puras en `src/characters/balance.ts`:
+
+- **Recursos iniciales:** se usan `maxHp` y `maxMp`; el rango permitido es 12-26 HP y 4-14 MP.
+- **Modificador ofensivo:** es el mayor modificador entre Fuerza, Destreza e Inteligencia.
+- **Modificador defensivo:** es el mayor modificador entre Constitución, Destreza y Sabiduría.
+- **Supervivencia mínima:** `maxHp + max(0, modificador defensivo) * 2`. Es un proxy de dos impactos mitigados, no una predicción de una campaña.
+- **Límites de comparación:** la supervivencia mínima no puede ser menor que 16 y la diferencia entre el mayor y el menor valor no puede superar 12.
+- **No dominancia:** ningún arquetipo puede ser igual o mejor en HP, MP, ataque, defensa y supervivencia, siendo estrictamente mejor en al menos una métrica.
+
+Estos límites solo validan el presupuesto inicial. No sustituyen pruebas internas de campaña: S13 aún debe medir rutas completas, tiempo hasta la primera recompensa y derrotas antes de cerrar el balance.
