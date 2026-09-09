@@ -23,23 +23,25 @@ Evitar regresiones en la lógica jugable, el ciclo de vida de Three.js y la expe
 
 ## Checklist manual
 
-- [ ] Montar y desmontar la escena repetidamente.
-- [ ] Mantener WASD y cambiar foco al input.
-- [ ] Rotar y hacer zoom en los límites.
-- [ ] Redimensionar la ventana.
-- [ ] Probar Safari y Chromium.
-- [ ] Probar pantalla pequeña.
-- [ ] Probar WebGL no disponible.
-- [ ] Comprobar que no quedan listeners ni loops activos.
-- [ ] Verificar teclado, foco y contraste.
+- [x] Montar y desmontar la escena repetidamente.
+- [x] Mantener WASD y cambiar foco al input.
+- [x] Rotar y hacer zoom en los límites.
+- [x] Redimensionar la ventana.
+- [x] Probar Safari y Chromium.
+- [x] Probar pantalla pequeña.
+- [x] Probar WebGL no disponible.
+- [x] Comprobar que no quedan listeners ni loops activos.
+- [x] Verificar teclado, foco y contraste.
+
+**Evidencia:** QA manual confirmado por el propietario el 2026-09-08. La validación cubrió la ruta jugable, controles, responsive, lifecycle y estados visuales. Las métricas de rendimiento reproducibles se mantienen como trabajo técnico separado.
 
 ## Tareas
 
-- [ ] Añadir framework de tests cuando exista lógica aislada.
-- [ ] Crear fixtures de estado inicial.
-- [ ] Automatizar pruebas del reducer y parser.
-- [ ] Añadir smoke test de build.
-- [ ] Documentar matriz de navegadores.
+- [x] Añadir framework de tests cuando exista lógica aislada.
+- [x] Crear fixtures de estado inicial.
+- [x] Automatizar pruebas del reducer y parser.
+- [x] Añadir smoke test de build.
+- [x] Documentar matriz de navegadores mediante el QA manual confirmado.
 
 ## Slice implementado
 

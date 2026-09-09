@@ -49,7 +49,7 @@ Este documento es el checklist operativo para convertir el demo actual en el MVP
 - [x] Definir dos zonas conectadas con entradas y salidas estables.
 - [x] Añadir transición validada y retorno seguro en el estado.
 - [x] Persistir zona visitada, punto de entrada y estado de gameplay.
-- [ ] Desmontar escenas sin recursos huérfanos.
+- [x] Desmontar escenas sin recursos huérfanos.
 
 **Pendiente de integración:** conectar el mapa al cargador y al montaje real de `GameScene`.
 
@@ -167,8 +167,11 @@ S6-S10 siguen parciales: faltan guardado manual y checkpoints, runtime declarati
 - [x] Añadir inventario básico con objeto de misión y consumible.
 - [x] Añadir encuentro determinista, daño, victoria, derrota y reintento.
 - [x] Añadir onboarding, foco visible, feedback de errores y `prefers-reduced-motion`.
+- [x] Completar QA manual de navegador, lifecycle, responsive y estados visuales.
+- [x] Instrumentar FPS, frame time, frames lentos, draw calls, triángulos, geometrías y texturas en desarrollo.
 - [ ] Unificar completamente el personaje con `GameState` y checks d20 del altar.
 - [ ] Cargar/desmontar `GameScene` desde JSON por zona sin decoración hardcoded.
 - [ ] Implementar guardado manual, autosave por checkpoint y recuperación atómica del estado completo.
 - [ ] Añadir runtime declarativo genérico para NPCs, loot, encuentros y narrativa.
-- [ ] Completar QA de navegador, balance de los tres arquetipos y medición en hardware objetivo.
+- [x] Completar QA de navegador y lifecycle.
+- [ ] Completar balance de los tres arquetipos y medición en hardware objetivo.

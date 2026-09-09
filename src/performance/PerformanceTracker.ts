@@ -13,6 +13,7 @@ export type PerformanceSnapshot = {
   readonly averageFrameTimeSeconds: number
   readonly minimumFrameTimeSeconds: number
   readonly maximumFrameTimeSeconds: number
+  readonly framesOver33ms: number
   readonly lastTimestampSeconds: number | null
 }
 
@@ -22,6 +23,7 @@ export type PerformanceSnapshotTarget = {
 
 const DEFAULT_WINDOW_SECONDS = 1
 const DEFAULT_MAX_SAMPLES = 240
+const SLOW_FRAME_SECONDS = 0.033
 
 /**
  * Collects frame timing data without relying on browser or renderer APIs.
@@ -36,6 +38,7 @@ export class PerformanceTracker {
   private frameTimeTotal = 0
   private longestFrameTime = 0
   private shortestFrameTime = Number.POSITIVE_INFINITY
+  private slowFrameCount = 0
   private lastTimestampSeconds: number | null = null
 
   public constructor(options: PerformanceTrackerOptions = {}) {
@@ -80,6 +83,7 @@ export class PerformanceTracker {
     this.frameTimeTotal += deltaSeconds
     this.longestFrameTime = Math.max(this.longestFrameTime, deltaSeconds)
     this.shortestFrameTime = Math.min(this.shortestFrameTime, deltaSeconds)
+    if (deltaSeconds > SLOW_FRAME_SECONDS) this.slowFrameCount += 1
     this.lastTimestampSeconds = timestampSeconds
 
     this.expireSamples(timestampSeconds)
@@ -97,6 +101,7 @@ export class PerformanceTracker {
     this.frameTimeTotal = 0
     this.longestFrameTime = 0
     this.shortestFrameTime = Number.POSITIVE_INFINITY
+    this.slowFrameCount = 0
     this.lastTimestampSeconds = null
   }
 
@@ -110,6 +115,7 @@ export class PerformanceTracker {
       averageFrameTimeSeconds: 0,
       minimumFrameTimeSeconds: 0,
       maximumFrameTimeSeconds: 0,
+      framesOver33ms: 0,
       lastTimestampSeconds: null,
     }
 
@@ -126,6 +132,7 @@ export class PerformanceTracker {
     target.averageFrameTimeSeconds = averageFrameTimeSeconds
     target.minimumFrameTimeSeconds = this.sampleCount === 0 ? 0 : this.shortestFrameTime
     target.maximumFrameTimeSeconds = this.sampleCount === 0 ? 0 : this.longestFrameTime
+    target.framesOver33ms = this.slowFrameCount
     target.averageFps = averageFrameTimeSeconds === 0 ? 0 : 1 / averageFrameTimeSeconds
     target.minimumFps = this.sampleCount === 0 ? 0 : 1 / this.longestFrameTime
     target.lastTimestampSeconds = this.lastTimestampSeconds
@@ -148,6 +155,7 @@ export class PerformanceTracker {
 
     this.frameTimeTotal -= removedFrameTime
     this.sampleCount -= 1
+    if (removedFrameTime > SLOW_FRAME_SECONDS) this.slowFrameCount -= 1
 
     if (removedFrameTime === this.longestFrameTime || removedFrameTime === this.shortestFrameTime) {
       this.recalculateExtremes()

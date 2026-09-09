@@ -19,7 +19,7 @@ El repositorio contiene un vertical slice jugable del MVP:
 - Persistencia local de personajes y progreso.
 - UI accesible con foco visible, Escape y soporte de movimiento reducido.
 
-El checklist de implementación se mantiene en [`docs/plan/MVP-EXECUTION.md`](./docs/plan/MVP-EXECUTION.md). Algunas capacidades del MVP completo, como authoring totalmente declarativo, guardado atómico y QA de navegador, continúan en evolución.
+El checklist de implementación se mantiene en [`docs/plan/MVP-EXECUTION.md`](./docs/plan/MVP-EXECUTION.md). El QA manual del demo está confirmado; siguen en evolución el authoring totalmente declarativo, el guardado atómico, el balance y la medición de rendimiento en hardware de referencia.
 
 ## Inicio rápido
 
