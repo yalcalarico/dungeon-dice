@@ -94,30 +94,34 @@ export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSessi
     const roll = action.roll ?? die + (action.modifier ?? SENTINEL_ATTACK_BONUS)
     const modifier = action.modifier ?? SENTINEL_ATTACK_BONUS
     const armorClass = playerArmorClass(session.character)
-    const hit = isSuccessfulAttack(die, roll, armorClass)
-    const damage = hit ? calculateDamage(action.damageRoll ?? 3, 1) : 0
+    const hit = doesAttackHit(die, roll, armorClass)
+    const damageDie = normalizeDamageRoll(action.damageRoll ?? 3)
+    const damage = hit ? calculateDamage(damageDie, 1) : 0
     const playerHp = Math.max(0, session.character.resources.hp - damage)
     const attackText = `Contraataque: d20 ${die} ${formatModifier(modifier)} = ${roll} contra CA ${armorClass}.`
-    if (playerHp === 0) return append({ ...session, character: { ...session.character, resources: { ...session.character.resources, hp: 0 } }, encounter: { ...session.encounter, status: 'defeat', turn: 'player', pendingEnemyDamage: 0 } }, `${attackText} El centinela causa ${damage} de daño y te derriba. Puedes reintentar el encuentro.`)
-    return append({ ...session, character: { ...session.character, resources: { ...session.character.resources, hp: playerHp } }, encounter: { ...session.encounter, turn: 'player', awaitingRoll: true, pendingEnemyDamage: 0 } }, hit ? `${attackText} El contraataque causa ${damage} de daño. Es tu turno: lanza el D20.` : `${attackText} El centinela falla. Es tu turno: lanza el D20.`)
+    if (playerHp === 0) return append({ ...session, character: { ...session.character, resources: { ...session.character.resources, hp: 0 } }, encounter: { ...session.encounter, status: 'defeat', turn: 'player', pendingEnemyDamage: 0 } }, `${attackText} El centinela causa ${damage} de daño (1D6: ${damageDie} +1) y te derriba. Puedes reintentar el encuentro.`)
+    return append({ ...session, character: { ...session.character, resources: { ...session.character.resources, hp: playerHp } }, encounter: { ...session.encounter, turn: 'player', awaitingRoll: true, pendingEnemyDamage: 0 } }, hit ? `${attackText} El contraataque causa ${damage} de daño (1D6: ${damageDie} +1). Es tu turno: lanza el D20.` : `${attackText} El centinela falla. Es tu turno: lanza el D20.`)
   }
   if (session.encounter.status !== 'active' || !session.encounter.awaitingRoll || session.encounter.turn !== 'player') return session
   const die = action.die ?? action.roll
   const modifier = action.modifier ?? attributeModifier(session.character.attributes.strength)
-  const hit = isSuccessfulAttack(die, action.roll, SENTINEL_ARMOR_CLASS)
-  const damage = hit ? calculateDamage(action.damageRoll ?? 4, modifier) : 0
+  const hit = doesAttackHit(die, action.roll, SENTINEL_ARMOR_CLASS)
+  const damageDie = normalizeDamageRoll(action.damageRoll ?? 4)
+  const damage = hit ? calculateDamage(damageDie, modifier) : 0
   const enemyHp = Math.max(0, session.encounter.enemyHp - damage)
   if (enemyHp === 0) return milestone({ ...session, lastRoll: action.roll, lastDie: action.die ?? action.roll, lastModifier: action.modifier ?? 0, encounter: { ...session.encounter, status: 'victory', enemyHp: 0, turns: session.encounter.turns + 1, awaitingRoll: false, pendingEnemyDamage: 0 } }, 'sentinel-defeated', 40, { id: 'moon-potion', label: 'Poción lunar', quantity: 2, kind: 'consumable' }, hit ? 'Tu golpe rompe la armadura del centinela.' : 'El centinela cae después de tu último intercambio.')
   const modifierText = formatModifier(modifier)
   const attackText = `Ataque: d20 ${die} ${modifierText} = ${action.roll} contra CA ${SENTINEL_ARMOR_CLASS}.`
-  return append({ ...session, lastRoll: action.roll, lastDie: die, lastModifier: modifier, encounter: { ...session.encounter, enemyHp, turns: session.encounter.turns + 1, awaitingRoll: false, turn: 'enemy', pendingEnemyDamage: 0 } }, hit ? `${attackText} Causas ${damage} de daño.` : `${attackText} El centinela esquiva y no causas daño.`)
+  return append({ ...session, lastRoll: action.roll, lastDie: die, lastModifier: modifier, encounter: { ...session.encounter, enemyHp, turns: session.encounter.turns + 1, awaitingRoll: false, turn: 'enemy', pendingEnemyDamage: 0 } }, hit ? `${attackText} Causas ${damage} de daño (1D6: ${damageDie} ${formatModifier(modifier)}).` : `${attackText} El centinela esquiva y no causas daño.`)
 }
 
 function playerArmorClass(character: Character): number { return 10 + attributeModifier(character.attributes.dexterity) }
 
-function isSuccessfulAttack(die: number, total: number, armorClass: number): boolean { return die !== 1 && (die === 20 || total >= armorClass) }
+export function doesAttackHit(die: number, total: number, armorClass: number): boolean { return die !== 1 && (die === 20 || total >= armorClass) }
 
-function calculateDamage(damageRoll: number, modifier: number): number { return Math.max(1, ((Math.floor(damageRoll) - 1) % 6) + 1 + modifier) }
+function normalizeDamageRoll(damageRoll: number): number { return ((Math.floor(damageRoll) - 1) % 6) + 1 }
+
+function calculateDamage(damageRoll: number, modifier: number): number { return Math.max(1, damageRoll + modifier) }
 
 function formatModifier(modifier: number): string { return `${modifier >= 0 ? '+' : ''}${modifier}` }
 
