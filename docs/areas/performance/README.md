@@ -15,21 +15,25 @@ Mantener una experiencia fluida superior a 60 FPS en el hardware de referencia s
 
 ## Medición
 
-Registrar FPS medio, mínimo, frame time, draw calls, triángulos y memoria durante exploración, zoom y rotación.
+Registrar FPS medio, mínimo, frame time, frames por encima de 33 ms, draw calls, triángulos, geometrías y texturas durante exploración, zoom y rotación. El panel de desarrollo muestra estas métricas cada 500 ms y `GameScene.getPerformanceSnapshot()` las expone para diagnósticos.
 
 ## Tareas
 
 - [x] Añadir overlay de diagnóstico en desarrollo.
 - [x] Crear controlador de calidad adaptativa con histéresis.
+- [x] Registrar frames por encima de 33 ms en la ventana deslizante.
+- [x] Exponer draw calls, triángulos, geometrías y texturas del renderer.
 - [ ] Medir escritorio y portátil con GPU integrada.
 - [ ] Compartir geometrías y materiales.
 - [ ] Evaluar instancing para bloques repetidos.
 - [ ] Limitar luces con sombras.
-- [ ] Añadir niveles de calidad.
+- [x] Añadir niveles de calidad.
 - [ ] Reducir o desactivar reflejos caros según dispositivo.
 - [ ] Verificar tamaño de bundle.
 - [ ] Considerar carga diferida de la escena 3D.
 - [ ] Registrar resultados reproducibles por navegador.
+
+**Medición actual:** `npm run build` produce un chunk principal de `817.51 kB` minificado (`219.47 kB` gzip) y Vite emite una advertencia por superar `500 kB`. La carga diferida queda pendiente como optimización posterior.
 
 ## Criterios de aceptación
 

@@ -25,7 +25,7 @@ Convertir la escena 3D en una exploración con objetivo, límites, interacción 
 ## Tareas
 
 - [ ] Extraer input a un controlador dedicado.
-- [ ] Ignorar WASD mientras el foco está en un elemento editable.
+- [x] Ignorar WASD mientras el foco está en un elemento editable.
 - [ ] Añadir pérdida de foco segura para teclas mantenidas.
 - [x] Crear entidades interactivas iniciales `altar` y `torch`.
 - [x] Crear sistema de proximidad y prompt contextual.
@@ -36,8 +36,8 @@ Convertir la escena 3D en una exploración con objetivo, límites, interacción 
 - [x] Mantener la progresión disponible después de un fallo no terminal.
 - [x] Definir flags y transiciones iniciales del altar.
 - [x] Implementar condición de victoria.
-- [ ] Implementar ruta de fallo recuperable.
-- [ ] Añadir reinicio sin recargar la página.
+- [x] Implementar ruta de fallo recuperable.
+- [x] Añadir reinicio sin recargar la página.
 
 ## Criterios de aceptación
 

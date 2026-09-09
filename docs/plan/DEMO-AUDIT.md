@@ -175,3 +175,18 @@ Desde la actualización anterior también se incorporó:
 - Test de integración para una acción con objeto incorrecto.
 
 El demo queda listo para QA manual final; las métricas de hardware y la migración declarativa completa siguen siendo trabajo posterior de validación/infraestructura, no se consideran falsamente completadas por compilar.
+
+## Confirmación posterior de QA
+
+El propietario confirmó el 2026-09-08 que el QA manual fue ejecutado satisfactoriamente. Quedan cubiertos navegador, lifecycle, controles, responsive, foco, estados visuales, ruta de éxito, ruta de fallo y reset. La evidencia se registró en `docs/areas/qa/README.md`.
+
+## Instrumentación posterior de rendimiento
+
+El diagnóstico de desarrollo ahora expone FPS medio, frame time, frames por encima de 33 ms, draw calls, triángulos, geometrías y texturas. Estas métricas mejoran la observabilidad, pero no sustituyen todavía una medición reproducible en hardware de referencia y GPU integrada.
+
+El trabajo restante para declarar el MVP completo se concentra en:
+
+- Medir y documentar rendimiento en dispositivos de referencia.
+- Aplicar y comprobar todos los presets de calidad, incluidos efectos costosos.
+- Generalizar el runtime declarativo y crear un segundo nivel desde JSON.
+- Completar guardado atómico, migraciones, progresión y balance.

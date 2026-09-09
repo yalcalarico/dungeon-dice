@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react'
-import { GameScene } from './game/GameScene'
+import { GameScene, type ScenePerformanceSnapshot } from './game/GameScene'
 import { createRandomD20 } from './dice/d20'
 import { createRandomD6 } from './dice/d6'
 import { createNarrativeEntry, type AltarActionId } from './narrative/altar'
@@ -43,6 +43,7 @@ function App() {
   const [lastDamageRoll, setLastDamageRoll] = useState<number | null>(null)
   const [autoD20, setAutoD20] = useState(false)
   const [autoD6, setAutoD6] = useState(false)
+  const [performanceSnapshot, setPerformanceSnapshot] = useState<ScenePerformanceSnapshot | null>(null)
   const rollTimerRef = useRef<number | null>(null)
   const combatTimerRef = useRef<number | null>(null)
   const turnTimerRef = useRef<number | null>(null)
@@ -134,7 +135,10 @@ function App() {
     }, (target) => setInteractionTarget(target?.id ?? null), (entityId) => setSelectedEntity(entityId === 'ash-sentinel' ? entityId : null))
     sceneRef.current = scene
     scene.start()
+    const performanceTimer = window.setInterval(() => setPerformanceSnapshot(scene.getPerformanceSnapshot()), 500)
     return () => {
+      window.clearInterval(performanceTimer)
+      setPerformanceSnapshot(null)
       sceneRef.current = null
       scene.destroy()
     }
@@ -359,6 +363,13 @@ function App() {
     <main className="app-shell">
       <div ref={viewportRef} className="game-viewport" role="img" aria-label="Escena 3D de la cripta" />
       <div className="vignette" />
+      {import.meta.env.DEV && performanceSnapshot && <aside className="performance-panel" aria-label="Diagnóstico de rendimiento">
+        <b>{performanceSnapshot.averageFps.toFixed(0)} FPS</b>
+        <span>{(performanceSnapshot.averageFrameTimeSeconds * 1000).toFixed(1)} ms</span>
+        <small>{performanceSnapshot.drawCalls} calls · {performanceSnapshot.triangles.toLocaleString('es-ES')} tris</small>
+        <small>{performanceSnapshot.framesOver33ms} frames &gt; 33 ms</small>
+        <small>{performanceSnapshot.geometries} geo · {performanceSnapshot.textures} tex</small>
+      </aside>}
 
       {creationOpen && <div className="modal-backdrop" role="presentation" onMouseDown={() => setCreationOpen(false)}><section className="onboarding-card" aria-labelledby="onboarding-title" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <button className="modal-close" type="button" aria-label="Cerrar creador de personaje" onClick={() => setCreationOpen(false)}>×</button>
