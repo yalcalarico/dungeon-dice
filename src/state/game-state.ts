@@ -18,6 +18,7 @@ import {
 } from '../narrative/altar'
 import { cryptOfLunargenta } from '../content'
 import { evaluateRequirements } from '../content/runtime'
+import { isBoundedCommand } from '../security/input-limits'
 
 export type GamePhase = 'exploration' | 'resolving' | 'paused' | 'victory' | 'failure'
 
@@ -36,7 +37,16 @@ export type GameState = {
   lastRollOutcome: 'success' | 'failure' | null
   pendingCheck: { actionId: NarrativeAction['id']; input: string } | null
   movementLocked: boolean
-  player: { hp: number; maxHp: number; mp: number; maxMp: number; attributes: { strength: number; dexterity: number; constitution: number; intelligence: number; wisdom: number; charisma: number } }
+  player: {
+    hp: number
+    maxHp: number
+    mp: number
+    maxMp: number
+    level?: number
+    experience?: number
+    inventory?: string[]
+    attributes: { strength: number; dexterity: number; constitution: number; intelligence: number; wisdom: number; charisma: number }
+  }
 }
 
 export type GameAction =
@@ -70,11 +80,12 @@ export function createInitialGameState(): GameState {
     lastRollOutcome: null,
     pendingCheck: null,
     movementLocked: false,
-    player: { hp: 18, maxHp: 18, mp: 7, maxMp: 7, attributes: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 } },
+    player: { hp: 18, maxHp: 18, mp: 7, maxMp: 7, level: 1, experience: 0, inventory: [], attributes: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 } },
   }
 }
 
 export function transitionGameState(state: GameState, action: GameAction, roller: D20Roller): GameState {
+  if (!isBoundedCommand(action)) return state
   if (action.type === 'reset') return createInitialGameState()
   if (action.type === 'pause') {
     if (state.phase !== 'exploration' && state.phase !== 'resolving') return state

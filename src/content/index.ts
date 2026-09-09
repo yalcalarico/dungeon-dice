@@ -25,7 +25,7 @@ export {
 } from './level-loader'
 
 export { validateContent, type ContentDiagnostic } from './content-validator'
-export { AuthoringValidationError, createLevelTemplate, exportCampaignJson, exportLevelJson } from './authoring'
+export { AuthoringValidationError, createLevelTemplate, exportCampaignJson, exportLevelJson, loadCampaignMap } from './authoring'
 
 import cryptOfLunargentaJson from './crypt-of-lunargenta.json'
 import { loadLevelConfig } from './level-loader'

@@ -16,6 +16,13 @@ export type ScenePerformanceSnapshot = PerformanceSnapshot & {
   readonly textures: number
 }
 
+export class WebGLUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super('No se pudo iniciar WebGL. Comprueba que el navegador permite WebGL y que la aceleración gráfica está activa.', { cause })
+    this.name = 'WebGLUnavailableError'
+  }
+}
+
 export class GameScene {
   private readonly host: HTMLElement
   private readonly onMessage: EnvironmentMessage
@@ -77,7 +84,12 @@ export class GameScene {
     this.onMessage = onMessage
     this.onInteractionTargetChange = onInteractionTargetChange
     this.onEntitySelectionChange = onEntitySelectionChange
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
+    try {
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
+    } catch (error) {
+      this.onMessage('La escena 3D no está disponible: WebGL no pudo iniciarse. El resto de la interfaz sigue accesible.')
+      throw new WebGLUnavailableError(error)
+    }
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap

@@ -2,6 +2,10 @@
 .app-shell { position: relative; background: #101416; }
 .game-viewport { position: absolute; inset: 0; z-index: 0; }
 .game-viewport canvas { display: block; width: 100%; height: 100%; }
+.scene-error { position: absolute; top: 50%; left: 50%; z-index: 7; width: min(430px, calc(100vw - 40px)); padding: 24px; transform: translate(-50%, -50%); border: 1px solid rgba(193, 169, 132, .65); background: rgba(13, 17, 17, .95); box-shadow: 0 20px 70px rgba(0, 0, 0, .6); color: #aaa99d; text-align: center; }
+.scene-error strong { color: #d6b782; font: 400 22px Georgia, serif; }
+.scene-error p { color: #d2a09a; font-size: 12px; line-height: 1.5; }
+.scene-error small { font-size: 10px; line-height: 1.5; }
 .vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at 49% 44%, transparent 30%, rgba(4, 7, 8, .18) 66%, rgba(3, 4, 5, .86) 120%); }
 .topbar, .left-rail, .location-card, .narrative-panel, .dice-widget, .controls, .corner-note { position: absolute; z-index: 2; }
 .topbar { top: 0; left: 0; right: 0; height: 70px; padding: 0 31px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(218, 211, 192, .14); background: linear-gradient(180deg, rgba(7, 10, 10, .74), transparent); font-size: 10px; letter-spacing: .15em; }

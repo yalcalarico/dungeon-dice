@@ -18,9 +18,19 @@ describe('zone transitions', () => {
   })
 
   it('validates and loads exported campaign maps', () => {
-    const exported = JSON.parse(JSON.stringify({ schemaVersion: 1, ...starterCampaignMap }))
+    const exported = JSON.parse(JSON.stringify(starterCampaignMap))
     expect(validateCampaignMap(exported).valid).toBe(true)
     expect(loadCampaignMap(exported).zones).toHaveLength(2)
-    expect(validateCampaignMap({ zones: [], connections: [{ fromZoneId: 'missing' }] }).valid).toBe(false)
+    expect(validateCampaignMap({ schemaVersion: 1, zones: [], connections: [{ fromZoneId: 'missing' }] }).valid).toBe(false)
+  })
+
+  it('rejects duplicate IDs and invalid exits or entries', () => {
+    const invalid = {
+      ...starterCampaignMap,
+      zones: [{ ...starterCampaignMap.zones[0], exitPointIds: ['north-gate', 'north-gate'] }, starterCampaignMap.zones[1]],
+      connections: [{ ...starterCampaignMap.connections[0], id: 'duplicate' }, { ...starterCampaignMap.connections[0], id: 'duplicate', fromExitId: 'unknown' }],
+    }
+
+    expect(validateCampaignMap(invalid)).toMatchObject({ valid: false, errors: expect.arrayContaining([expect.stringContaining('duplicate'), expect.stringContaining('missing origin exit')]) })
   })
 })

@@ -69,6 +69,22 @@ export function createMvpSession(character: Character): MvpSession {
 }
 
 export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSession {
+  return synchronizeMvpSession(applyMvpActionInternal(synchronizeMvpSession(session), action))
+}
+
+export function synchronizeMvpSession(session: MvpSession): MvpSession {
+  const inventory = inventoryFromCharacter(session.character.inventory)
+  return {
+    ...session,
+    character: { ...session.character, inventory: inventory.flatMap((item) => Array.from({ length: item.quantity }, () => item.id)) },
+    inventory,
+    experience: session.character.experience,
+    level: session.character.level,
+    completedMilestones: [...session.character.completedMilestones],
+  }
+}
+
+function applyMvpActionInternal(session: MvpSession, action: MvpAction): MvpSession {
   if (action.type === 'travel') {
     if (session.zoneId === action.zoneId) return session
     const next = { ...session, zoneId: action.zoneId, checkpoint: { zoneId: action.zoneId, hp: session.character.resources.hp }, visitedZoneIds: session.visitedZoneIds.includes(action.zoneId) ? session.visitedZoneIds : [...session.visitedZoneIds, action.zoneId] }
@@ -175,7 +191,7 @@ function addInventoryItem(inventory: InventoryItem[], item: InventoryItem): Inve
   return [...inventory, item]
 }
 
-function inventoryFromCharacter(ids: string[]): InventoryItem[] {
+export function inventoryFromCharacter(ids: string[]): InventoryItem[] {
   const inventory: InventoryItem[] = []
   for (const id of ids) {
     const item = id === 'moon-potion' ? { id: 'moon-potion' as const, label: 'Poción lunar', quantity: 1, kind: 'consumable' as const } : id === 'ash-key' ? { id: 'ash-key' as const, label: 'Llave de ceniza', quantity: 1, kind: 'quest' as const, equippable: true } : null

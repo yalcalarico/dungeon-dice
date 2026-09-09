@@ -1,5 +1,6 @@
-import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react'
+import { startTransition, useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react'
 import { GameScene, type ScenePerformanceSnapshot } from './game/GameScene'
+import { INPUT_LIMITS } from './security/input-limits'
 import { createRandomD20 } from './dice/d20'
 import { createRandomD6 } from './dice/d6'
 import { createNarrativeEntry, type AltarActionId } from './narrative/altar'
@@ -44,6 +45,7 @@ function App() {
   const [autoD20, setAutoD20] = useState(false)
   const [autoD6, setAutoD6] = useState(false)
   const [performanceSnapshot, setPerformanceSnapshot] = useState<ScenePerformanceSnapshot | null>(null)
+  const [sceneError, setSceneError] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'error' | 'idle'>('idle')
   const rollTimerRef = useRef<number | null>(null)
   const combatTimerRef = useRef<number | null>(null)
@@ -137,9 +139,15 @@ function App() {
 
   useEffect(() => {
     if (!viewportRef.current) return
-    const scene = new GameScene(viewportRef.current, (message) => {
-      setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message }, roller)))
-    }, (target) => setInteractionTarget(target?.id ?? null), (entityId) => setSelectedEntity(entityId === 'ash-sentinel' ? entityId : null))
+    let scene: GameScene
+    try {
+      scene = new GameScene(viewportRef.current, (message) => {
+        setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message }, roller)))
+      }, (target) => setInteractionTarget(target?.id ?? null), (entityId) => setSelectedEntity(entityId === 'ash-sentinel' ? entityId : null))
+    } catch (error) {
+      startTransition(() => setSceneError(error instanceof Error ? error.message : 'No se pudo iniciar la escena 3D.'))
+      return
+    }
     sceneRef.current = scene
     scene.start()
     const performanceTimer = window.setInterval(() => setPerformanceSnapshot(scene.getPerformanceSnapshot()), 500)
@@ -183,6 +191,10 @@ function App() {
   const submitAction = (value: string) => {
     const clean = value.trim()
     if (!clean) return
+    if (clean.length > INPUT_LIMITS.maxCommandTextLength) {
+      setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message: `La acción es demasiado larga. Usa ${INPUT_LIMITS.maxCommandTextLength} caracteres o menos.`, }, roller)))
+      return
+    }
     setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'submit-input', input: clean, targetId: interactionTarget ?? undefined }, roller)))
     setAction('')
   }
@@ -369,6 +381,7 @@ function App() {
   return (
     <main className="app-shell">
       <div ref={viewportRef} className="game-viewport" role="img" aria-label="Escena 3D de la cripta" />
+      {sceneError && <aside className="scene-error" role="alert"><strong>Escena 3D no disponible</strong><p>{sceneError}</p><small>La interfaz y el registro siguen disponibles, pero esta sesión requiere WebGL para explorar.</small></aside>}
       <div className="vignette" />
       {import.meta.env.DEV && performanceSnapshot && <aside className="performance-panel" aria-label="Diagnóstico de rendimiento">
         <b>{performanceSnapshot.averageFps.toFixed(0)} FPS</b>

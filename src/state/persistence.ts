@@ -1,10 +1,7 @@
 import type { GameState } from './game-state'
+import { INPUT_LIMITS, parseJsonWithinLimits } from '../security/input-limits'
 
 export const STATE_SCHEMA_VERSION = 1 as const
-const MAX_PAYLOAD_BYTES = 250_000
-const MAX_DEPTH = 20
-const MAX_ARRAY_LENGTH = 1_000
-const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 
 export type PersistedGameState = {
   schemaVersion: typeof STATE_SCHEMA_VERSION
@@ -22,21 +19,17 @@ export function serializeGameState(state: GameState): string {
   validateGameState(state)
   const payload: PersistedGameState = { schemaVersion: STATE_SCHEMA_VERSION, state }
   const serialized = JSON.stringify(payload)
-  if (serialized.length > MAX_PAYLOAD_BYTES) throw new StateValidationError('El estado supera el límite de tamaño permitido.')
+  if (new TextEncoder().encode(serialized).byteLength > INPUT_LIMITS.maxJsonBytes) throw new StateValidationError('El estado supera el límite de tamaño permitido.')
   return serialized
 }
 
 export function deserializeGameState(serialized: string): GameState {
-  if (serialized.length > MAX_PAYLOAD_BYTES) throw new StateValidationError('El guardado supera el límite de tamaño permitido.')
-
   let input: unknown
   try {
-    input = JSON.parse(serialized)
-  } catch {
-    throw new StateValidationError('El guardado no contiene JSON válido.')
+    input = parseJsonWithinLimits(serialized)
+  } catch (error) {
+    throw new StateValidationError(error instanceof Error ? error.message.replace('El JSON', 'El guardado').replace('El contenido', 'El guardado') : 'El guardado no es válido.')
   }
-
-  inspectLimits(input, 0)
   return migratePersistedState(input).state
 }
 
@@ -68,7 +61,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
   if (value.phase === 'paused' && !['exploration', 'resolving'].includes(value.pausedPhase as string)) throw new StateValidationError('Una partida pausada debe conservar su fase anterior.')
   if (!isRecord(value.flags) || !isBoolean(value.flags.altarInvestigated) || !isBoolean(value.flags.altarInvestigationSucceeded) || !isBoolean(value.flags.altarInvestigationFailed)) throw new StateValidationError('Las flags del estado no son válidas.')
   if (!isArray(value.entries) || !isArray(value.availableActions) || !isArray(value.objectives) || !isArray(value.checks)) throw new StateValidationError('Las colecciones del estado no son válidas.')
-  if (!isRecord(value.player) || !validResource(value.player.hp, value.player.maxHp) || !validResource(value.player.mp, value.player.maxMp)) throw new StateValidationError('Los recursos del jugador no son válidos.')
+  if (!isRecord(value.player) || !validResource(value.player.hp, value.player.maxHp) || !validResource(value.player.mp, value.player.maxMp) || !optionalPositiveInteger(value.player.level) || !optionalNonNegativeNumber(value.player.experience) || !optionalStringArray(value.player.inventory) || !validAttributes(value.player.attributes)) throw new StateValidationError('Los recursos del jugador no son válidos.')
   if (value.pendingCheck !== null && !isRecord(value.pendingCheck)) throw new StateValidationError('La prueba pendiente no es válida.')
 }
 
@@ -76,15 +69,13 @@ function validResource(current: unknown, maximum: unknown): boolean {
   return isFiniteNumber(current) && isFiniteNumber(maximum) && current >= 0 && maximum >= 0 && current <= maximum
 }
 
-function inspectLimits(value: unknown, depth: number): void {
-  if (depth > MAX_DEPTH) throw new StateValidationError('El guardado supera la profundidad máxima.')
-  if (!value || typeof value !== 'object') return
-  for (const [key, child] of Object.entries(value)) {
-    if (DANGEROUS_KEYS.has(key)) throw new StateValidationError(`El guardado contiene una clave peligrosa: ${key}.`)
-    inspectLimits(child, depth + 1)
-  }
-  if (Array.isArray(value) && value.length > MAX_ARRAY_LENGTH) throw new StateValidationError('El guardado contiene demasiados elementos.')
+function validAttributes(value: unknown): boolean {
+  return isRecord(value) && ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'].every((key) => Number.isInteger(value[key]) && (value[key] as number) >= 1 && (value[key] as number) <= 20)
 }
+
+function optionalPositiveInteger(value: unknown): boolean { return value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= 1) }
+function optionalNonNegativeNumber(value: unknown): boolean { return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0) }
+function optionalStringArray(value: unknown): boolean { return value === undefined || isStringArray(value) }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

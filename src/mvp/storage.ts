@@ -1,5 +1,5 @@
 import { validateCharacter, type Character } from '../characters/character'
-import { INVENTORY_CAPACITY, type InventoryItem, type MvpSession } from './campaign'
+import { INVENTORY_CAPACITY, inventoryFromCharacter, synchronizeMvpSession, type InventoryItem, type MvpSession } from './campaign'
 
 const CHARACTER_KEY = 'dungeon-dice:characters:v1'
 const SESSION_KEY = 'dungeon-dice:mvp-session:v1'
@@ -31,15 +31,16 @@ export function validateMvpSession(value: unknown, characterId?: string): value 
 function normalizeMvpSession(value: unknown, characterId?: string): MvpSession | null {
   if (!isRecord(value) || !validateCharacter(value.character) || (characterId !== undefined && value.character.id !== characterId)) return null
   const zoneId = value.zoneId === 'ashen-courtyard' || value.zoneId === 'crypt-of-lunargenta' ? value.zoneId : null
-  const inventory = normalizeInventory(value.inventory)
+  const storedInventory = normalizeInventory(value.inventory)
   const encounter = isRecord(value.encounter) ? value.encounter : {}
   const npcTrust = finiteNumber(value.npcTrust)
   const experience = finiteNumber(value.experience)
   const level = finiteNumber(value.level)
-  if (!zoneId || !inventory || !Array.isArray(value.visitedZoneIds) || !value.visitedZoneIds.every((id): id is string => typeof id === 'string') || npcTrust === null || experience === null || level === null || !Array.isArray(value.completedMilestones) || !value.completedMilestones.every((id): id is string => typeof id === 'string') || !Array.isArray(value.log) || !value.log.every((entry): entry is string => typeof entry === 'string')) return null
-  const normalizedExperience = Math.max(0, experience)
-  const normalizedLevel = Math.max(1, Math.floor(level))
-  const completedMilestones = [...new Set(value.completedMilestones)]
+  if (!zoneId || !storedInventory || !Array.isArray(value.visitedZoneIds) || !value.visitedZoneIds.every((id): id is string => typeof id === 'string') || npcTrust === null || experience === null || level === null || !Array.isArray(value.completedMilestones) || !value.completedMilestones.every((id): id is string => typeof id === 'string') || !Array.isArray(value.log) || !value.log.every((entry): entry is string => typeof entry === 'string')) return null
+  const normalizedExperience = Math.max(0, value.character.experience)
+  const normalizedLevel = Math.max(1, Math.floor(value.character.level))
+  const completedMilestones = [...new Set(value.character.completedMilestones)]
+  const inventory = inventoryFromCharacter(value.character.inventory)
   const character: Character = {
     ...value.character,
     experience: normalizedExperience,
@@ -74,7 +75,8 @@ function normalizeMvpSession(value: unknown, characterId?: string): MvpSession |
     completedMilestones,
     log: value.log.slice(-12),
   }
-  return validateNormalizedSession(normalized) ? normalized : null
+  const synchronized = synchronizeMvpSession(normalized)
+  return validateNormalizedSession(synchronized) ? synchronized : null
 }
 
 function normalizeInventory(value: unknown): InventoryItem[] | null {

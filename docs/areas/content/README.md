@@ -13,8 +13,8 @@ El proyecto todavía no cumple completamente este objetivo:
 - Los IDs y acciones del altar están definidos en `src/narrative/altar.ts`.
 - Las posiciones del altar, antorchas y puerta están definidas en `GameScene.ts`.
 - Las reglas de requisitos y consecuencias están codificadas en condicionales TypeScript.
-- No existe un exportador/importador de niveles.
-- No existe todavía exportación/importación ni versionado de migraciones para contenido.
+- El authoring de campaña ya permite exportar y cargar mapas JSON versionados.
+- Las migraciones entre versiones todavía no están implementadas.
 
 La fundación inicial ya existe: hay schema tipado, JSON de la cripta actual, loader y validación de referencias. El runtime todavía no consume todas las reglas desde ese JSON.
 
@@ -82,7 +82,7 @@ Un nivel debe poder describirse con un documento similar a este:
 }
 ```
 
-El formato es una dirección de diseño, no un contrato de producción todavía. Los nombres finales deben establecerse al implementar el schema.
+El formato de niveles es un contrato versionado. El mapa de campaña usa `schemaVersion: 1` y exige IDs únicos, salidas declaradas y conexiones que apunten a zonas, salidas y entradas existentes.
 
 ## Reglas de parametrización
 
@@ -105,6 +105,7 @@ La futura herramienta debe permitir:
 - Validar schema y referencias.
 - Mostrar errores de configuración legibles.
 - Exportar el nivel sin perder IDs ni versionado.
+- Exportar mapas de campaña con JSON determinista y cargarlos desde texto JSON.
 - Migrar versiones antiguas del schema.
 - Generar un resumen de objetivos y flujos.
 - Detectar acciones imposibles, objetivos sin salida y referencias inexistentes.
@@ -132,8 +133,8 @@ La futura herramienta debe permitir:
 - [ ] Parametrizar bloqueo de movimiento por acción o flujo.
 - [ ] Generar objetivos y checks desde la configuración.
 - [ ] Añadir validación de grafo narrativo.
-- [ ] Añadir exportación de la configuración actual.
-- [ ] Añadir versionado y migraciones.
+- [x] Añadir exportación y carga de mapas de campaña.
+- [ ] Añadir migraciones entre versiones.
 - [ ] Crear un segundo nivel usando únicamente JSON.
 
 ## Criterios de aceptación
@@ -145,3 +146,4 @@ La futura herramienta debe permitir:
 - Las acciones bloqueantes aparecen en el checklist y las no bloqueantes permiten continuar.
 - Un JSON inválido falla con errores concretos antes de iniciar la partida.
 - Exportar y volver a importar conserva IDs, objetivos, acciones y consecuencias.
+- Exportar y volver a importar un mapa conserva `schemaVersion`, zonas, conexiones, entradas y salidas.

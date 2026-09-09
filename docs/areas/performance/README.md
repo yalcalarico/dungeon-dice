@@ -35,6 +35,18 @@ Registrar FPS medio, mínimo, frame time, frames por encima de 33 ms, draw calls
 
 **Medición actual:** `npm run build` produce un chunk principal de `817.51 kB` minificado (`219.47 kB` gzip) y Vite emite una advertencia por superar `500 kB`. La carga diferida queda pendiente como optimización posterior.
 
+## Checklist de entrega reproducible
+
+- [ ] Ejecutar `npm ci`, `npm run build` y anotar versión de Node, navegador, sistema operativo y commit.
+- [ ] Servir la aplicación con `npm run dev` o `npm run preview`, con DevTools cerradas durante la medición.
+- [ ] Registrar durante 60 segundos cada escenario: reposo, exploración WASD, zoom y rotación de cámara.
+- [ ] Anotar FPS medio/mínimo, frame time, frames sobre 33 ms, draw calls, triángulos, geometrías y texturas del panel de desarrollo.
+- [ ] Repetir en el hardware de referencia y en un portátil con GPU integrada, indicando modelo de GPU y pixel ratio.
+- [ ] Guardar una captura o transcripción de cada medición y comparar contra el presupuesto de esta área.
+- [ ] Repetir tras activar cada nivel de calidad y verificar que la jugabilidad no cambia.
+
+Las mediciones de FPS, consumo térmico, drivers y compatibilidad WebGL requieren hardware real; no se consideran cubiertas por Vitest, lint o build.
+
 ## Criterios de aceptación
 
 - Existe una medición reproducible de FPS y frame time en modo desarrollo.
@@ -42,3 +54,4 @@ Registrar FPS medio, mínimo, frame time, frames por encima de 33 ms, draw calls
 - Los efectos nuevos incluyen una medición antes y después.
 - La calidad puede reducirse sin romper la jugabilidad cuando el rendimiento cae.
 - El bundle y sus advertencias quedan documentados antes de la entrega.
+- Las mediciones incluyen entorno, duración, escenarios y evidencia reproducible.
