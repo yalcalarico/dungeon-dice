@@ -13,6 +13,7 @@ describe('PerformanceTracker', () => {
       averageFrameTimeSeconds: 0,
       minimumFrameTimeSeconds: 0,
       maximumFrameTimeSeconds: 0,
+      framesOver33ms: 0,
       lastTimestampSeconds: null,
     })
   })
@@ -30,6 +31,7 @@ describe('PerformanceTracker', () => {
     expect(snapshot.averageFrameTimeSeconds).toBeCloseTo(0.07 / 3)
     expect(snapshot.minimumFrameTimeSeconds).toBe(0.01)
     expect(snapshot.maximumFrameTimeSeconds).toBe(0.04)
+    expect(snapshot.framesOver33ms).toBe(1)
     expect(snapshot.averageFps).toBeCloseTo(3 / 0.07)
     expect(snapshot.minimumFps).toBe(25)
     expect(snapshot.lastTimestampSeconds).toBe(0.02)
@@ -67,6 +69,7 @@ describe('PerformanceTracker', () => {
       averageFrameTimeSeconds: 0,
       minimumFrameTimeSeconds: 0,
       maximumFrameTimeSeconds: 0,
+      framesOver33ms: 0,
       lastTimestampSeconds: null,
     })
   })

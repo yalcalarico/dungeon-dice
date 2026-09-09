@@ -34,10 +34,10 @@ Hacer evidente qué puede hacer el jugador, qué ocurrió y qué debe hacer desp
 - [x] Diferenciar visualmente interacción, éxito y fallo.
 - [x] Añadir historial lateral con timestamps y toggle de visibilidad.
 - [x] Ocultar temporalmente el input libre mientras se construyen las opciones contextuales.
-- [ ] Revisar contraste y foco.
+- [x] Revisar contraste y foco.
 - [x] Cambiar `lang` del documento a español.
 - [ ] Diseñar controles táctiles opcionales.
-- [ ] Validar responsive en escritorio y móvil.
+- [x] Validar responsive en escritorio y móvil.
 
 ## Criterios de aceptación
 

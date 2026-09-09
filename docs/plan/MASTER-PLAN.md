@@ -132,7 +132,7 @@ Este documento termina cuando el demo cumple su definición de terminado. No pre
 - Sesión: transiciones reales de `App` envueltas en un estado de sesión con historial de estados.
 - Arte procedural: columnas y capiteles low-poly compartidos añadidos con coste controlado.
 - Accesibilidad: menú funcional, foco, Escape y documento en español.
-- Pendiente antes de cerrar el demo: fallo recuperable, tests automatizados, medición de rendimiento y estados visuales completos de objetos.
+- Pendiente antes de cerrar el demo: medición en hardware objetivo, balance de arquetipos y parametrización declarativa de niveles.
 
 La parametrización JSON no es requisito para cerrar la primera cripta, pero sí es requisito antes de construir varios niveles. Está especificada en [Contenido parametrizable](../areas/content/README.md) y debe comenzar con una migración equivalente del nivel actual.
 
