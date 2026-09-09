@@ -11,21 +11,21 @@ Esta área es prioritaria antes de construir varios niveles. El código debe int
 El proyecto todavía no cumple completamente este objetivo:
 
 - Los IDs y acciones públicas del altar están definidos en `src/narrative/altar.ts`, pero sus etiquetas, keywords, checks, objetivos y coste se leen de la configuración.
-- Las posiciones del altar, antorchas y puerta están definidas en `GameScene.ts`.
-- El Patio de Ceniza, Iria, la reliquia y el Centinela todavía se construyen con posiciones, tipos y reglas hardcoded en `GameScene.ts`, `App.tsx` y `mvp/campaign.ts`; no existe aún un JSON equivalente para esa zona.
-- Las reglas específicas del vertical slice todavía tienen condicionales TypeScript, aunque consultan el nivel activo para sus metadatos.
+- Las geometrías y materiales genéricos se construyen en `GameScene.ts`, pero las posiciones, tipos, IDs, bounds y entidades de ambas zonas se leen desde configuración.
+- El Patio de Ceniza, Iria, la reliquia y el Centinela ya tienen un JSON equivalente; sus reglas y recompensas se consultan desde el nivel activo.
+- Las reglas técnicas del vertical slice conservan algunos condicionales de orquestación, pero ya no contienen labels, posiciones, stats, recompensas ni diálogos de campaña.
 - El authoring de campaña ya permite exportar y cargar mapas JSON versionados.
 - Las migraciones entre versiones todavía no están implementadas.
 
-La fundación inicial ya existe: hay schema tipado, JSON de la cripta actual, JSON del Patio de Ceniza, loader y validación de referencias. El runtime todavía no consume todas las reglas desde esos JSON.
+La fundación inicial ya existe: hay schema tipado, JSON de la cripta, JSON del Patio de Ceniza, loader, validación de referencias y montaje de ambas zonas desde el índice de campaña.
 
-La implementación actual es un vertical slice válido, pero no una arquitectura de niveles parametrizable.
+La implementación actual ya tiene una arquitectura de niveles parametrizable para las entidades y reglas cubiertas por el schema; faltan catálogo visual, migraciones y generalizar algunos flujos técnicos.
 
 ### Auditoría de residuos hardcoded
 
-La migración de runtime deja los datos visibles de diálogo, recompensas, items, títulos de zona, entradas y transiciones respaldados por los niveles cargados desde JSON. `src/content/dialogue.ts` es únicamente un adaptador compatible para la API antigua; `progression.ts` indexa las recompensas de campaña; y almacenamiento/sincronización consultan ese mismo catálogo.
+La migración de runtime deja los datos visibles de diálogo, recompensas, items, títulos de zona, entradas, entidades y transiciones respaldados por los niveles cargados desde JSON. `src/content/dialogue.ts` es únicamente un adaptador compatible para la API antigua; `progression.ts` indexa las recompensas de campaña; y almacenamiento/sincronización consultan ese mismo catálogo.
 
-Se mantienen como reglas técnicas o contratos públicos: los umbrales numéricos de nivel (`0`, `50`, `125`), los IDs union de `MvpSession`, los IDs de acciones y flags de `altar.ts`, y textos de sistema que no representan contenido de campaña. No se han modificado `GameScene.ts`, los loaders/JSON ni los tests de contenido.
+Se mantienen como reglas técnicas o contratos públicos: los umbrales numéricos de nivel (`0`, `50`, `125`), los IDs de acciones y flags heredados de `altar.ts`, y textos de sistema que no representan contenido de campaña. Los IDs de zona se validan contra el catálogo cargado.
 
 ## Contrato de configuración
 
@@ -132,25 +132,25 @@ La futura herramienta debe permitir:
 ## Tareas prioritarias
 
 - [x] Diseñar el schema inicial de nivel.
-- [ ] Extraer toda la geometría y reglas de altar, antorchas y puerta a configuración JSON consumida por runtime.
+- [x] Extraer posiciones, entidades y reglas de altar, antorchas, puerta y Patio a configuración JSON consumida por runtime.
 - [x] Crear loader y validador de configuración.
 - [x] Consumir desde runtime labels, keywords, dificultad y coste de reintento.
 - [x] Añadir evaluador base de requisitos y efectos sin dependencia de React o Three.js.
 - [ ] Crear catálogo de tipos visuales permitidos.
-- [ ] Crear sistema genérico de objetos interactivos.
-- [ ] Crear evaluador genérico de requisitos.
-- [ ] Crear ejecutor genérico de efectos y transiciones.
+- [x] Crear sistema genérico de objetos interactivos.
+- [x] Crear evaluador genérico de requisitos.
+- [x] Crear ejecutor base de efectos y transiciones.
 - [ ] Parametrizar políticas de éxito, fallo y continuidad.
 - [ ] Parametrizar bloqueo de movimiento por acción o flujo.
-- [ ] Generar objetivos y checks desde la configuración.
+- [x] Generar objetivos y checks del altar desde la configuración.
 - [ ] Añadir validación de grafo narrativo.
 - [x] Añadir exportación y carga de mapas de campaña.
 - [ ] Añadir migraciones entre versiones.
-- [x] Crear un segundo nivel usando únicamente JSON.
+- [x] Crear un segundo nivel usando únicamente JSON para entidades, bounds, ambiente, NPCs, reliquia y enemigo.
 
 ### Auditoría de parametrización
 
-El estado actual no cumple todavía el criterio de "contenido sin editar TypeScript". El JSON de `crypt-of-lunargenta` parametriza parte de la cripta, pero el runtime conserva reglas específicas para altar, antorchas, puerta, patio, NPC, reliquia, enemigo, combate, recompensas y transiciones. El cierre de S3/S4 requiere migrar también el Patio de Ceniza a configuración y hacer que `GameScene` monte objetos por tipo desde esa configuración.
+El contenido visible de ambas zonas y sus metadatos de campaña ya provienen de JSON. Permanecen como trabajo posterior el catálogo visual versionado, migraciones de schema, validación de grafo y la extracción completa de políticas técnicas de movimiento/combate.
 
 ## Criterios de aceptación
 
