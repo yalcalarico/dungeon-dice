@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createCharacter } from '../characters/character'
-import { applyMvpAction, createMvpSession } from './campaign'
+import { ashenCourtyard } from '../content'
+import { applyMvpAction, createMvpSession, findEnemy, findReward } from './campaign'
 
 const character = createCharacter('Alda', 'vanguard', 'wanderer', '00000000-0000-4000-8000-000000000001')
 
@@ -15,6 +16,19 @@ describe('MVP campaign rules', () => {
     expect(session.experience).toBe(25)
     expect(session.inventory[0].id).toBe('ash-key')
     expect(session.visitedZoneIds).toContain('ashen-courtyard')
+  })
+
+  it('uses changed declarative Patio labels, rewards and enemy rules without new code', () => {
+    const changedLevel = {
+      ...ashenCourtyard,
+      actions: ashenCourtyard.actions.map((action) => action.id === 'talk-npc' ? { ...action, label: 'Consultar al vigia' } : action),
+      rewards: ashenCourtyard.rewards?.map((reward) => reward.id === 'direct-route-reward' ? { ...reward, experience: 99, item: { ...reward.item!, label: 'Marca del umbral' } } : reward),
+      enemies: ashenCourtyard.enemies?.map((enemy) => ({ ...enemy, name: 'Vigia del umbral', stats: { ...enemy.stats, armorClass: 17, damage: { ...enemy.stats.damage, modifier: 3 } } })),
+    }
+
+    expect(changedLevel.actions.find((action) => action.id === 'talk-npc')?.label).toBe('Consultar al vigia')
+    expect(findReward([changedLevel], 'direct-route-reward')).toMatchObject({ experience: 99, item: { label: 'Marca del umbral' } })
+    expect(findEnemy(changedLevel)).toMatchObject({ name: 'Vigia del umbral', stats: { armorClass: 17, damage: { modifier: 3 } } })
   })
 
   it('makes encounter rewards idempotent and supports defeat recovery', () => {

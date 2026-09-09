@@ -14,7 +14,7 @@ export type RuntimeEffects = {
 export function evaluateRequirement(requirement: Requirement, context: RuntimeContext): boolean {
   if ('nearObject' in requirement) return context.nearbyObjectIds.has(requirement.nearObject)
   if ('objectiveCompleted' in requirement) return context.completedObjectives.has(requirement.objectiveCompleted)
-  return context.flags[requirement.flag] === true
+  return context.flags[requirement.flag] === (requirement.value ?? true)
 }
 
 export function evaluateRequirements(requirements: readonly Requirement[], context: RuntimeContext): boolean {

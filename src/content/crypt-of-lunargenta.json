@@ -27,18 +27,20 @@
       "id": "altar-investigation",
       "label": "Prueba de sabiduría del altar",
       "die": "d20",
+      "ability": "wisdom",
       "difficulty": 12,
       "blocking": true,
-      "onSuccess": { "effects": [{ "setFlag": "altarInvestigationSucceeded" }] },
-      "onFailure": { "effects": [{ "setFlag": "altarInvestigationFailed" }], "continue": true, "terminal": "failure" }
+      "onSuccess": { "effects": [{ "setFlag": "altarInvestigationSucceeded" }], "message": "Encuentras una runa tibia bajo la ceniza. El altar te reconoce." },
+      "onFailure": { "effects": [{ "setFlag": "altarInvestigationFailed" }], "message": "La ceniza se arremolina y oculta la inscripción. Algo en el altar queda despierto.", "continue": true, "terminal": "failure" }
     }
   ],
   "actions": [
-     { "id": "inspect-altar", "label": "Inspeccionar el altar", "keywords": ["inspeccionar altar", "inspeccionar el altar", "examinar altar", "investigar altar"], "requires": [{ "nearObject": "altar-main" }], "check": "altar-investigation", "effects": [{ "setFlag": "altarInvestigated" }], "movement": { "during": "locked", "after": "allowed" } },
-      { "id": "retry-altar", "label": "Volver a intentar (-3 HP)", "keywords": ["volver a intentar", "reintentar altar", "reintentar la prueba"], "requires": [], "effects": [], "movement": { "during": "locked", "after": "allowed" } },
-      { "id": "inspect-torch", "label": "Inspeccionar la antorcha", "keywords": ["inspeccionar la antorcha", "inspeccionar antorcha", "examinar antorcha", "mirar antorcha"], "requires": [{ "objectiveCompleted": "objective-investigate-altar" }], "effects": [], "movement": { "during": "allowed", "after": "allowed" } },
-      { "id": "light-torch", "label": "Encender la antorcha", "keywords": ["encender la antorcha", "encender antorcha", "prender antorcha", "avivar la antorcha"], "requires": [{ "objectiveCompleted": "objective-investigate-altar" }, { "nearObject": "torch-1" }], "effects": [{ "setFlag": "torchLit" }], "movement": { "during": "allowed", "after": "allowed" } },
-      { "id": "open-exit", "label": "Abrir la puerta de salida", "keywords": ["abrir la puerta de salida", "abrir puerta", "abrir la puerta", "abrir salida", "abrir la salida"], "requires": [{ "objectiveCompleted": "objective-light-torch" }, { "nearObject": "exit-door" }], "effects": [{ "setFlag": "exitOpened" }], "movement": { "during": "locked", "after": "locked" } }
+     { "id": "inspect-altar", "label": "Inspeccionar el altar", "keywords": ["inspeccionar altar", "inspeccionar el altar", "examinar altar", "investigar altar"], "requires": [{ "nearObject": "altar-main" }, { "flag": "altarInvestigated", "value": false }], "check": "altar-investigation", "effects": [{ "setFlag": "altarInvestigated" }], "movement": { "during": "locked", "after": "allowed" } },
+      { "id": "retry-altar", "label": "Volver a intentar (-3 HP)", "keywords": ["volver a intentar", "reintentar altar", "reintentar la prueba"], "requires": [{ "flag": "altarInvestigationFailed" }, { "flag": "altarInvestigationSucceeded", "value": false }], "check": "altar-investigation", "effects": [], "movement": { "during": "locked", "after": "allowed" }, "exclusive": true },
+      { "id": "inspect-torch", "label": "Inspeccionar la antorcha", "keywords": ["inspeccionar la antorcha", "inspeccionar antorcha", "examinar antorcha", "mirar antorcha"], "requires": [{ "objectiveCompleted": "objective-investigate-altar" }, { "flag": "torchLit", "value": false }], "effects": [], "messages": { "success": "La antorcha está fría, pero la runa del altar dejó una chispa atrapada en su mecha." }, "movement": { "during": "allowed", "after": "allowed" } },
+      { "id": "light-torch", "label": "Encender la antorcha", "keywords": ["encender la antorcha", "encender antorcha", "prender antorcha", "avivar la antorcha"], "requires": [{ "objectiveCompleted": "objective-investigate-altar" }, { "nearObject": "torch-1" }, { "flag": "torchLit", "value": false }], "effects": [{ "setFlag": "torchLit" }], "messages": { "success": "La chispa de la runa prende la antorcha. Al fondo, la puerta de salida despierta." }, "movement": { "during": "allowed", "after": "allowed" } },
+      { "id": "open-exit", "label": "Abrir la puerta de salida", "keywords": ["abrir la puerta de salida", "abrir puerta", "abrir la puerta", "abrir salida", "abrir la salida"], "requires": [{ "objectiveCompleted": "objective-light-torch" }, { "nearObject": "exit-door" }, { "flag": "exitOpened", "value": false }], "effects": [{ "setFlag": "exitOpened" }], "messages": { "success": "La puerta se abre con un trueno suave. Más allá espera {destination}.", "unavailable": "La puerta permanece sellada. Debes {requirements} antes de abrir la salida." }, "movement": { "during": "locked", "after": "locked" } }
   ],
-  "victory": { "requires": [{ "objectiveCompleted": "objective-open-exit" }] }
+  "victory": { "requires": [{ "objectiveCompleted": "objective-open-exit" }] },
+  "messages": { "unavailableAction": "Esa acción no está disponible todavía. Examina el altar y sigue las pistas." }
 }

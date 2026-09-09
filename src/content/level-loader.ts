@@ -43,11 +43,21 @@ export function validateLevelConfig(input: unknown): LevelValidationResult {
   const checks = array(input.checks, '$.checks', errors)
   const actions = array(input.actions, '$.actions', errors)
   const victory = record(input.victory, '$.victory', errors)
+  if (input.messages !== undefined) validateLevelMessages(input.messages, '$.messages', errors)
 
   const objectIds = validateObjects(objects, errors)
   const objectiveIds = validateObjectives(objectives, errors)
   const checkIds = validateChecks(checks, errors)
   const actionIds = validateActions(actions, errors)
+  const npcItems = optionalArray(input.npcs, '$.npcs', errors)
+  const npcIds = validateNpcs(npcItems, objectIds, errors)
+  const dialogueItems = optionalArray(input.dialogues, '$.dialogues', errors)
+  const dialogueIds = validateDialogues(dialogueItems, npcIds, errors)
+  validateNpcDialogueReferences(npcItems, dialogueIds, errors)
+  const rewardIds = validateRewards(optionalArray(input.rewards, '$.rewards', errors), errors)
+  const relicIds = validateRelics(optionalArray(input.relics, '$.relics', errors), objectIds, rewardIds, errors)
+  const enemyIds = validateEnemies(optionalArray(input.enemies, '$.enemies', errors), objectIds, rewardIds, errors)
+  const routeChoiceIds = validateRouteChoices(optionalArray(input.routeChoices, '$.routeChoices', errors), rewardIds, objectIds, objectiveIds, errors)
   validateObjectActionReferences(objects, actionIds, errors)
   validateActionReferences(actions, checkIds, objectIds, objectiveIds, errors)
   validateCheckReferences(checks, objectiveIds, errors)
@@ -58,6 +68,12 @@ export function validateLevelConfig(input: unknown): LevelValidationResult {
     ['objectives', objectiveIds],
     ['checks', checkIds],
     ['actions', actionIds],
+    ['npcs', npcIds],
+    ['dialogues', dialogueIds],
+    ['rewards', rewardIds],
+    ['relics', relicIds],
+    ['enemies', enemyIds],
+    ['routeChoices', routeChoiceIds],
   ], errors)
 
   if (errors.length > 0) return invalid(errors)
@@ -99,7 +115,7 @@ function validateObjects(items: unknown[], errors: LevelValidationError[]): Set<
     const object = record(item, path, errors)
     if (!object) return
     requireString(object, 'id', path, errors)
-    requireOneOf(object, 'type', ['altar', 'torch', 'exit-door'], path, errors)
+    requireOneOf(object, 'type', ['altar', 'torch', 'exit-door', 'npc', 'relic', 'enemy'], path, errors)
     const position = record(object.position, `${path}.position`, errors)
     if (position) for (const key of ['x', 'y', 'z']) requireNumber(position, key, `${path}.position`, errors)
     const interaction = object.interaction === undefined ? undefined : record(object.interaction, `${path}.interaction`, errors)
@@ -110,6 +126,113 @@ function validateObjects(items: unknown[], errors: LevelValidationError[]): Set<
     }
   })
   return ids
+}
+
+function validateNpcs(items: unknown[], objectIds: Set<string>, errors: LevelValidationError[]): Set<string> {
+  const ids = collectIds(items, '$.npcs', errors)
+  items.forEach((item, index) => {
+    const path = `$.npcs[${index}]`
+    const npc = record(item, path, errors)
+    if (!npc) return
+    requireString(npc, 'id', path, errors); requireString(npc, 'name', path, errors)
+    reference(npc.objectId, objectIds, `${path}.objectId`, errors, 'object')
+    strings(npc.dialogueIds, `${path}.dialogueIds`, errors)
+  })
+  return ids
+}
+
+function validateDialogues(items: unknown[], npcIds: Set<string>, errors: LevelValidationError[]): Set<string> {
+  const ids = collectIds(items, '$.dialogues', errors)
+  items.forEach((item, index) => {
+    const path = `$.dialogues[${index}]`
+    const dialogue = record(item, path, errors)
+    if (!dialogue) return
+    requireString(dialogue, 'id', path, errors); requireString(dialogue, 'text', path, errors)
+    reference(dialogue.npcId, npcIds, `${path}.npcId`, errors, 'NPC')
+    requireNumber(dialogue, 'minTrust', path, errors)
+    if (dialogue.nextTrust !== undefined) requireNumber(dialogue, 'nextTrust', path, errors)
+  })
+  return ids
+}
+
+function validateNpcDialogueReferences(items: unknown[], dialogueIds: Set<string>, errors: LevelValidationError[]) {
+  items.forEach((item, index) => {
+    if (!isRecord(item)) return
+    validateReferences(item.dialogueIds, dialogueIds, `$.npcs[${index}].dialogueIds`, errors, 'dialogue')
+  })
+}
+
+function validateRewards(items: unknown[], errors: LevelValidationError[]): Set<string> {
+  const ids = collectIds(items, '$.rewards', errors)
+  items.forEach((item, index) => {
+    const path = `$.rewards[${index}]`
+    const reward = record(item, path, errors)
+    if (!reward) return
+    requireString(reward, 'id', path, errors); requireNumber(reward, 'experience', path, errors)
+    if (reward.experience && isNumber(reward.experience) && reward.experience < 0) add(errors, `${path}.experience`, 'must not be negative')
+    if (reward.item !== undefined) validateRewardItem(reward.item, `${path}.item`, errors)
+  })
+  return ids
+}
+
+function validateRewardItem(value: unknown, path: string, errors: LevelValidationError[]) {
+  const item = record(value, path, errors)
+  if (!item) return
+  requireString(item, 'id', path, errors); requireString(item, 'label', path, errors)
+  requireNumber(item, 'quantity', path, errors); requireOneOf(item, 'kind', ['consumable', 'quest'], path, errors)
+  if (isNumber(item.quantity) && item.quantity <= 0) add(errors, `${path}.quantity`, 'must be greater than zero')
+  if (item.equippable !== undefined) requireBoolean(item, 'equippable', path, errors)
+}
+
+function validateRelics(items: unknown[], objectIds: Set<string>, rewardIds: Set<string>, errors: LevelValidationError[]): Set<string> {
+  const ids = collectIds(items, '$.relics', errors)
+  items.forEach((item, index) => {
+    const path = `$.relics[${index}]`
+    const relic = record(item, path, errors)
+    if (!relic) return
+    requireString(relic, 'id', path, errors); requireString(relic, 'name', path, errors)
+    reference(relic.objectId, objectIds, `${path}.objectId`, errors, 'object')
+    validateReferences(relic.rewardIds, rewardIds, `${path}.rewardIds`, errors, 'reward')
+  })
+  return ids
+}
+
+function validateEnemies(items: unknown[], objectIds: Set<string>, rewardIds: Set<string>, errors: LevelValidationError[]): Set<string> {
+  const ids = collectIds(items, '$.enemies', errors)
+  items.forEach((item, index) => {
+    const path = `$.enemies[${index}]`
+    const enemy = record(item, path, errors)
+    if (!enemy) return
+    requireString(enemy, 'id', path, errors); requireString(enemy, 'name', path, errors)
+    reference(enemy.objectId, objectIds, `${path}.objectId`, errors, 'object')
+    const stats = record(enemy.stats, `${path}.stats`, errors)
+    if (stats) {
+      requireNumber(stats, 'maxHp', `${path}.stats`, errors); requireNumber(stats, 'armorClass', `${path}.stats`, errors); requireNumber(stats, 'attackBonus', `${path}.stats`, errors)
+      const damage = record(stats.damage, `${path}.stats.damage`, errors)
+      if (damage) { requireOneOf(damage, 'die', ['d6'], `${path}.stats.damage`, errors); requireNumber(damage, 'modifier', `${path}.stats.damage`, errors) }
+    }
+    validateReferences(enemy.rewardIds, rewardIds, `${path}.rewardIds`, errors, 'reward')
+  })
+  return ids
+}
+
+function validateRouteChoices(items: unknown[], rewardIds: Set<string>, objectIds: Set<string>, objectiveIds: Set<string>, errors: LevelValidationError[]): Set<string> {
+  const ids = collectIds(items, '$.routeChoices', errors)
+  items.forEach((item, index) => {
+    const path = `$.routeChoices[${index}]`
+    const route = record(item, path, errors)
+    if (!route) return
+    requireString(route, 'id', path, errors); requireString(route, 'label', path, errors)
+    requireNumber(route, 'minTrust', path, errors)
+    validateRequirements(route.requires, `${path}.requires`, errors, objectIds, objectiveIds)
+    validateEffects(route.effects, `${path}.effects`, errors, objectiveIds)
+    validateReferences(route.rewardIds, rewardIds, `${path}.rewardIds`, errors, 'reward')
+  })
+  return ids
+}
+
+function validateReferences(value: unknown, ids: Set<string>, path: string, errors: LevelValidationError[], kind: string) {
+  strings(value, path, errors).forEach((item, index) => reference(item, ids, `${path}[${index}]`, errors, kind))
 }
 
 function validateObjectives(items: unknown[], errors: LevelValidationError[]): Set<string> {
@@ -134,7 +257,7 @@ function validateChecks(items: unknown[], errors: LevelValidationError[]): Set<s
     const check = record(item, path, errors)
     if (!check) return
     requireString(check, 'id', path, errors); requireString(check, 'label', path, errors)
-    requireOneOf(check, 'die', ['d20'], path, errors); requireNumber(check, 'difficulty', path, errors)
+    requireOneOf(check, 'die', ['d20'], path, errors); requireOneOf(check, 'ability', ['wisdom', 'investigation'], path, errors); requireNumber(check, 'difficulty', path, errors)
     validateOutcome(check.onSuccess, `${path}.onSuccess`, errors)
     validateOutcome(check.onFailure, `${path}.onFailure`, errors)
   })
@@ -151,6 +274,8 @@ function validateActions(items: unknown[], errors: LevelValidationError[]): Set<
     strings(action.keywords, `${path}.keywords`, errors)
     const movement = record(action.movement, `${path}.movement`, errors)
     if (movement) { requireOneOf(movement, 'during', ['locked', 'allowed'], `${path}.movement`, errors); requireOneOf(movement, 'after', ['locked', 'allowed'], `${path}.movement`, errors) }
+    if (action.messages !== undefined) validateActionMessages(action.messages, `${path}.messages`, errors)
+    if (action.exclusive !== undefined) requireBoolean(action, 'exclusive', path, errors)
   })
   return ids
 }
@@ -159,8 +284,21 @@ function validateOutcome(value: unknown, path: string, errors: LevelValidationEr
   const outcome = record(value, path, errors)
   if (!outcome) return
   validateEffects(outcome.effects, `${path}.effects`, errors, objectiveIds)
+  if (outcome.message !== undefined) requireString(outcome, 'message', path, errors)
   if (outcome.continue !== undefined) requireBoolean(outcome, 'continue', path, errors)
   if (outcome.terminal !== undefined) requireString(outcome, 'terminal', path, errors)
+}
+
+function validateActionMessages(value: unknown, path: string, errors: LevelValidationError[]) {
+  const messages = record(value, path, errors)
+  if (!messages) return
+  if (messages.success !== undefined) requireString(messages, 'success', path, errors)
+  if (messages.unavailable !== undefined) requireString(messages, 'unavailable', path, errors)
+}
+
+function validateLevelMessages(value: unknown, path: string, errors: LevelValidationError[]) {
+  const messages = record(value, path, errors)
+  if (messages?.unavailableAction !== undefined) requireString(messages, 'unavailableAction', path, errors)
 }
 
 function validateRequirements(value: unknown, path: string, errors: LevelValidationError[], objectIds: Set<string>, objectiveIds: Set<string>) {
@@ -169,10 +307,11 @@ function validateRequirements(value: unknown, path: string, errors: LevelValidat
     const requirement = record(item, `${path}[${index}]`, errors)
     if (!requirement) return
     const keys = Object.keys(requirement)
-    if (keys.length !== 1 || !['nearObject', 'objectiveCompleted', 'flag'].includes(keys[0])) add(errors, `${path}[${index}]`, 'must contain exactly one supported requirement')
+    const validFlagRequirement = keys.every((key) => key === 'flag' || key === 'value') && keys.includes('flag')
+    if ((!validFlagRequirement && keys.length !== 1) || (!validFlagRequirement && !['nearObject', 'objectiveCompleted', 'flag'].includes(keys[0]))) add(errors, `${path}[${index}]`, 'must contain exactly one supported requirement')
     if (requirement.nearObject !== undefined) reference(requirement.nearObject, objectIds, `${path}[${index}].nearObject`, errors, 'object')
     if (requirement.objectiveCompleted !== undefined) reference(requirement.objectiveCompleted, objectiveIds, `${path}[${index}].objectiveCompleted`, errors, 'objective')
-    if (requirement.flag !== undefined) requireString(requirement, 'flag', `${path}[${index}]`, errors)
+    if (requirement.flag !== undefined) { requireString(requirement, 'flag', `${path}[${index}]`, errors); if (requirement.value !== undefined) requireBoolean(requirement, 'value', `${path}[${index}]`, errors) }
   })
 }
 
@@ -238,6 +377,7 @@ function reference(value: unknown, ids: Set<string>, path: string, errors: Level
 function strings(value: unknown, path: string, errors: LevelValidationError[]): string[] { if (!Array.isArray(value)) { add(errors, path, 'must be an array'); return [] } return value.filter((item) => { if (!isString(item)) { add(errors, path, 'must contain only strings'); return false }; return true }) as string[] }
 function record(value: unknown, path: string, errors: LevelValidationError[]): Record<string, unknown> | null { if (!isRecord(value)) { add(errors, path, 'must be an object'); return null }; return value }
 function array(value: unknown, path: string, errors: LevelValidationError[]): unknown[] { if (!Array.isArray(value)) { add(errors, path, 'must be an array'); return [] }; return value }
+function optionalArray(value: unknown, path: string, errors: LevelValidationError[]): unknown[] { if (value === undefined) return []; return array(value, path, errors) }
 function requireString(object: Record<string, unknown>, key: string, path: string, errors: LevelValidationError[]): string | undefined { if (!isString(object[key])) { add(errors, `${path}.${key}`, 'must be a string'); return undefined }; return object[key] }
 function requireNumber(object: Record<string, unknown>, key: string, path: string, errors: LevelValidationError[]) { if (!isNumber(object[key])) add(errors, `${path}.${key}`, 'must be a finite number') }
 function requireBoolean(object: Record<string, unknown>, key: string, path: string, errors: LevelValidationError[]) { if (typeof object[key] !== 'boolean') add(errors, `${path}.${key}`, 'must be a boolean') }

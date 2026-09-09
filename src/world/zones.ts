@@ -1,4 +1,5 @@
 import type { GameState } from '../state/game-state'
+import campaignMapJson from '../content/campaign-map.json'
 
 export const CAMPAIGN_MAP_SCHEMA_VERSION = 1 as const
 
@@ -25,17 +26,7 @@ export type CampaignMap = {
 
 export type CampaignMapValidationResult = { valid: true; map: CampaignMap } | { valid: false; errors: readonly string[] }
 
-export const starterCampaignMap: CampaignMap = {
-  schemaVersion: CAMPAIGN_MAP_SCHEMA_VERSION,
-  zones: [
-    { id: 'crypt-of-lunargenta', title: 'La Cripta de Lunargenta', entryPointId: 'start', exitPointIds: ['north-gate'] },
-    { id: 'ashen-courtyard', title: 'El Patio de Ceniza', entryPointId: 'crypt-gate', exitPointIds: ['tower-path'] },
-  ],
-  connections: [
-    { id: 'crypt-to-courtyard', fromZoneId: 'crypt-of-lunargenta', fromExitId: 'north-gate', toZoneId: 'ashen-courtyard', toEntryId: 'crypt-gate' },
-    { id: 'courtyard-to-crypt', fromZoneId: 'ashen-courtyard', fromExitId: 'tower-path', toZoneId: 'crypt-of-lunargenta', toEntryId: 'start' },
-  ],
-}
+export const starterCampaignMap: CampaignMap = loadCampaignMap(campaignMapJson)
 
 export function validateCampaignMap(value: unknown): CampaignMapValidationResult {
   if (!isRecord(value)) return { valid: false, errors: ['campaign map must be an object'] }

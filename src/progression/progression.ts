@@ -1,3 +1,5 @@
+import { campaignLevels } from '../content'
+
 export const PROGRESSION_SCHEMA_VERSION = 1 as const
 
 export type ProgressionState = {
@@ -15,10 +17,11 @@ export type MilestoneDefinition = {
 export const progressionTable = {
   schemaVersion: PROGRESSION_SCHEMA_VERSION,
   levels: [0, 50, 125],
-  milestones: [
-    { id: 'relic-discovered', experience: 25, label: 'Reliquia descubierta' },
-    { id: 'sentinel-defeated', experience: 40, label: 'Centinela derrotado' },
-  ],
+  milestones: campaignLevels.flatMap((level) => (level.rewards ?? []).map((reward) => ({
+    id: reward.id,
+    experience: reward.experience,
+    label: reward.item?.label ?? reward.id,
+  }))),
 } as const
 
 export function levelForExperience(experience: number): number {

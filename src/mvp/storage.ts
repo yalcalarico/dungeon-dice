@@ -1,5 +1,6 @@
 import { validateCharacter, type Character } from '../characters/character'
-import { INVENTORY_CAPACITY, inventoryFromCharacter, synchronizeMvpSession, type InventoryItem, type MvpSession } from './campaign'
+import { INVENTORY_CAPACITY, findInventoryItem, inventoryFromCharacter, synchronizeMvpSession, type InventoryItem, type MvpSession } from './campaign'
+import { getLevelByZoneId } from '../content'
 
 const CHARACTER_KEY = 'dungeon-dice:characters:v1'
 const SESSION_KEY = 'dungeon-dice:mvp-session:v1'
@@ -30,7 +31,7 @@ export function validateMvpSession(value: unknown, characterId?: string): value 
 
 function normalizeMvpSession(value: unknown, characterId?: string): MvpSession | null {
   if (!isRecord(value) || !validateCharacter(value.character) || (characterId !== undefined && value.character.id !== characterId)) return null
-  const zoneId = value.zoneId === 'ashen-courtyard' || value.zoneId === 'crypt-of-lunargenta' ? value.zoneId : null
+  const zoneId = isConfiguredZone(value.zoneId) ? value.zoneId : null
   const storedInventory = normalizeInventory(value.inventory)
   const encounter = isRecord(value.encounter) ? value.encounter : {}
   const npcTrust = finiteNumber(value.npcTrust)
@@ -56,7 +57,7 @@ function normalizeMvpSession(value: unknown, characterId?: string): MvpSession |
     routeChoice: value.routeChoice === 'relic' || value.routeChoice === 'direct' ? value.routeChoice : null,
     checkpoint: normalizeCheckpoint(value.checkpoint, zoneId, character.resources.hp),
     inventory,
-    equippedItemId: value.equippedItemId === 'moon-potion' || value.equippedItemId === 'ash-key' ? value.equippedItemId : null,
+    equippedItemId: typeof value.equippedItemId === 'string' && findInventoryItem(value.equippedItemId) ? value.equippedItemId : null,
     inventoryCapacity: positiveNumber(value.inventoryCapacity, INVENTORY_CAPACITY),
     experience: normalizedExperience,
     lastRoll: finiteOrNull(value.lastRoll),
@@ -83,14 +84,16 @@ function normalizeInventory(value: unknown): InventoryItem[] | null {
   if (!Array.isArray(value)) return null
   const items = new Map<InventoryItem['id'], InventoryItem>()
   for (const candidate of value) {
-    if (!isRecord(candidate) || (candidate.id !== 'moon-potion' && candidate.id !== 'ash-key') || typeof candidate.label !== 'string' || (candidate.kind !== 'consumable' && candidate.kind !== 'quest') || typeof candidate.quantity !== 'number' || !Number.isInteger(candidate.quantity) || candidate.quantity <= 0) return null
+    if (!isRecord(candidate) || typeof candidate.id !== 'string' || !findInventoryItem(candidate.id) || typeof candidate.quantity !== 'number' || !Number.isInteger(candidate.quantity) || candidate.quantity <= 0) return null
     const id = candidate.id
-    const label = candidate.label
+    const configuredItem = findInventoryItem(id)
+    if (!configuredItem) return null
+    const label = configuredItem.label
     const quantity = candidate.quantity
-    const kind = candidate.kind
+    const kind = configuredItem.kind
     const existing = items.get(id)
     if (existing) existing.quantity += quantity
-    else items.set(id, { id, label, quantity, kind, equippable: candidate.equippable === true })
+    else items.set(id, { id, label, quantity, kind, equippable: configuredItem.equippable })
   }
   return [...items.values()]
 }
@@ -101,7 +104,7 @@ function validateNormalizedSession(session: MvpSession): boolean {
 
 function normalizeCheckpoint(value: unknown, fallbackZoneId: MvpSession['zoneId'], fallbackHp: number): MvpSession['checkpoint'] {
   if (!isRecord(value)) return { zoneId: fallbackZoneId, hp: fallbackHp }
-  const zoneId = value.zoneId === 'ashen-courtyard' || value.zoneId === 'crypt-of-lunargenta' ? value.zoneId : fallbackZoneId
+  const zoneId = isConfiguredZone(value.zoneId) ? value.zoneId : fallbackZoneId
   const hp = typeof value.hp === 'number' && Number.isFinite(value.hp) ? Math.max(1, Math.min(fallbackHp, value.hp)) : fallbackHp
   return { zoneId, hp }
 }
@@ -113,3 +116,4 @@ function finiteOrZero(value: unknown): number { return typeof value === 'number'
 function nonNegativeNumber(value: unknown, fallback: number): number { return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : fallback }
 function positiveNumber(value: unknown, fallback: number): number { return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value) }
+function isConfiguredZone(value: unknown): value is MvpSession['zoneId'] { return typeof value === 'string' && getLevelByZoneId(value) !== undefined }

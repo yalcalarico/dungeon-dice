@@ -1,5 +1,6 @@
 import type { Character } from '../characters/character'
-import type { MvpSession, InventoryItem } from '../mvp/campaign'
+import { findInventoryItem, type MvpSession, type InventoryItem } from '../mvp/campaign'
+import { getLevelByZoneId } from '../content'
 import type { GameState } from './game-state'
 
 export function syncCharacterToGameState(state: GameState, character: Character): GameState {
@@ -61,7 +62,7 @@ export function syncMvpSessionToGameState(state: GameState, session: MvpSession)
 function inventoryFromCharacter(ids: string[], existing: InventoryItem[]): InventoryItem[] {
   const inventory: InventoryItem[] = []
   for (const id of ids) {
-    const item = existing.find((candidate) => candidate.id === id) ?? knownInventoryItem(id)
+    const item = existing.find((candidate) => candidate.id === id) ?? findInventoryItem(id)
     if (!item) continue
     const current = inventory.find((candidate) => candidate.id === item.id)
     if (current) current.quantity += 1
@@ -70,12 +71,6 @@ function inventoryFromCharacter(ids: string[], existing: InventoryItem[]): Inven
   return inventory
 }
 
-function knownInventoryItem(id: string): InventoryItem | null {
-  if (id === 'moon-potion') return { id, label: 'Poción lunar', quantity: 1, kind: 'consumable' }
-  if (id === 'ash-key') return { id, label: 'Llave de ceniza', quantity: 1, kind: 'quest', equippable: true }
-  return null
-}
-
 function isMvpZone(zoneId: string): zoneId is MvpSession['zoneId'] {
-  return zoneId === 'crypt-of-lunargenta' || zoneId === 'ashen-courtyard'
+  return getLevelByZoneId(zoneId) !== undefined
 }

@@ -6,6 +6,7 @@ import {
   type AltarFlags,
 } from './altar'
 import type { D20Roller } from '../dice/d20'
+import { cryptOfLunargenta, type LevelConfig } from '../content'
 
 const failedRoll: D20Roller = {
   roll: (modifier = 0) => ({ die: 20, value: 1, modifier, total: 1 + modifier, critical: 'natural-1' }),
@@ -60,5 +61,23 @@ describe('altar action resolution', () => {
     expect(exit.outcome).toBeUndefined()
     expect(exit.effects.exitOpened).toBe(true)
     expect(exit.movementLocked).toBe(false)
+  })
+
+  it('derives labels, difficulty and effects from the level configuration', () => {
+    const level = structuredClone(cryptOfLunargenta) as LevelConfig
+    const inspect = level.actions.find((action) => action.id === 'inspect-altar')
+    const check = level.checks.find((candidate) => candidate.id === 'altar-investigation')
+    if (!inspect || !check) throw new Error('altar config fixture is incomplete')
+    inspect.label = 'Leer la inscripción'
+    inspect.effects = [{ setFlag: 'altarInvestigated' }, { setFlag: 'torchLit' }]
+    check.difficulty = 15
+
+    const result = resolveAltarAction('investigar altar', initialAltarFlags(), {
+      roll: (modifier = 0) => ({ die: 20, value: 10, modifier, total: 10 + modifier, critical: null }),
+    }, 0, level)
+
+    expect(availableAltarActions(initialAltarFlags(), level)[0]?.label).toBe('Leer la inscripción')
+    expect(result.entries[0]?.text).toContain('contra 15')
+    expect(result.effects).toMatchObject({ altarInvestigated: true, torchLit: true })
   })
 })

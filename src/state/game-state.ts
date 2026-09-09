@@ -16,9 +16,10 @@ import {
   type NarrativeEntry,
   type Objective,
 } from '../narrative/altar'
-import { cryptOfLunargenta } from '../content'
+import { cryptOfLunargenta, getLevelByZoneId } from '../content'
 import { evaluateRequirements } from '../content/runtime'
 import { isBoundedCommand } from '../security/input-limits'
+import { starterCampaignMap } from '../world/zones'
 
 export type GamePhase = 'exploration' | 'resolving' | 'paused' | 'victory' | 'failure'
 
@@ -61,16 +62,17 @@ export type GameAction =
 
 export function createInitialGameState(): GameState {
   const flags = initialAltarFlags()
+  const initialLevel = cryptOfLunargenta
 
   return {
     phase: 'exploration',
-    zoneId: 'crypt-of-lunargenta',
-    entryPointId: 'start',
-    visitedZoneIds: ['crypt-of-lunargenta'],
+    zoneId: initialLevel.id,
+    entryPointId: starterCampaignMap.zones.find((zone) => zone.id === initialLevel.id)?.entryPointId ?? '',
+    visitedZoneIds: [initialLevel.id],
     pausedPhase: undefined,
     flags,
     entries: [
-      createNarrativeEntry('Narrador', 'La lluvia golpea las bóvedas. Un altar cubierto de ceniza espera en la cripta.'),
+      createNarrativeEntry('Narrador', `La lluvia golpea las bóvedas. Un altar cubierto de ceniza espera en ${initialLevel.title.toLocaleLowerCase()}.`),
       createNarrativeEntry('Sistema', 'Acércate al altar para investigar las runas y comenzar la aventura.', 'muted'),
     ],
     availableActions: availableAltarActions(flags),
@@ -97,15 +99,18 @@ export function transitionGameState(state: GameState, action: GameAction, roller
   }
   if (action.type === 'change-zone') {
     if (!action.zoneId || action.zoneId === state.zoneId) return state
+    const level = getLevelByZoneId(action.zoneId)
+    const zone = starterCampaignMap.zones.find((candidate) => candidate.id === action.zoneId)
+    if (!level || !zone) return state
     return {
       ...state,
       phase: 'exploration',
       zoneId: action.zoneId,
-      entryPointId: action.zoneId === 'ashen-courtyard' ? 'crypt-gate' : 'start',
+      entryPointId: zone.entryPointId,
       pendingCheck: null,
-      availableActions: action.zoneId === 'crypt-of-lunargenta' ? availableAltarActions(state.flags) : [],
+      availableActions: action.zoneId === cryptOfLunargenta.id ? availableAltarActions(state.flags) : [],
       movementLocked: false,
-      entries: [...state.entries, createNarrativeEntry('Sistema', `Has entrado en ${action.zoneId === 'ashen-courtyard' ? 'el Patio de Ceniza' : 'la Cripta de Lunargenta'}.`, 'gold')],
+      entries: [...state.entries, createNarrativeEntry('Sistema', `Has entrado en ${level.title}.`, 'gold')],
     }
   }
   if (state.phase === 'paused' || state.phase === 'victory') return state
@@ -174,7 +179,9 @@ export function transitionGameState(state: GameState, action: GameAction, roller
     }
   }
 
-  const requiresRoll = actionId === 'inspect-altar' && !state.flags.altarInvestigated
+  const configuredAction = getLevelByZoneId(state.zoneId)?.actions.find((candidate) => candidate.id === actionId)
+  const configuredCheck = configuredAction?.check ? state.checks.find((check) => check.id === configuredAction.check) : undefined
+  const requiresRoll = configuredCheck !== undefined && !configuredCheck.completed
   if (requiresRoll) {
     return {
       ...state,
@@ -222,7 +229,7 @@ export function restoreGameSnapshot(snapshot: GameSnapshot): GameState {
 
 function isConfiguredActionAllowed(state: GameState, actionId: NarrativeAction['id'], targetId: string | undefined): boolean {
   if (!targetId) return false
-  const configuredAction = cryptOfLunargenta.actions.find((candidate) => candidate.id === actionId)
+  const configuredAction = getLevelByZoneId(state.zoneId)?.actions.find((candidate) => candidate.id === actionId)
   if (!configuredAction) return false
   const completedObjectives = new Set(state.objectives.filter((objective) => objective.completed).map((objective) => objective.id))
   const spatialRequirements = configuredAction.requires.filter((requirement) => 'nearObject' in requirement)

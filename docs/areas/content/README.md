@@ -10,18 +10,24 @@ Esta área es prioritaria antes de construir varios niveles. El código debe int
 
 El proyecto todavía no cumple completamente este objetivo:
 
-- Los IDs y acciones del altar están definidos en `src/narrative/altar.ts`.
+- Los IDs y acciones públicas del altar están definidos en `src/narrative/altar.ts`, pero sus etiquetas, keywords, checks, objetivos y coste se leen de la configuración.
 - Las posiciones del altar, antorchas y puerta están definidas en `GameScene.ts`.
 - El Patio de Ceniza, Iria, la reliquia y el Centinela todavía se construyen con posiciones, tipos y reglas hardcoded en `GameScene.ts`, `App.tsx` y `mvp/campaign.ts`; no existe aún un JSON equivalente para esa zona.
-- Las reglas de requisitos y consecuencias están codificadas en condicionales TypeScript.
+- Las reglas específicas del vertical slice todavía tienen condicionales TypeScript, aunque consultan el nivel activo para sus metadatos.
 - El authoring de campaña ya permite exportar y cargar mapas JSON versionados.
 - Las migraciones entre versiones todavía no están implementadas.
 
-La fundación inicial ya existe: hay schema tipado, JSON de la cripta actual, loader y validación de referencias. El runtime todavía no consume todas las reglas desde ese JSON.
+La fundación inicial ya existe: hay schema tipado, JSON de la cripta actual, JSON del Patio de Ceniza, loader y validación de referencias. El runtime todavía no consume todas las reglas desde esos JSON.
 
 La implementación actual es un vertical slice válido, pero no una arquitectura de niveles parametrizable.
 
-## Contrato de configuración propuesto
+### Auditoría de residuos hardcoded
+
+La migración de runtime deja los datos visibles de diálogo, recompensas, items, títulos de zona, entradas y transiciones respaldados por los niveles cargados desde JSON. `src/content/dialogue.ts` es únicamente un adaptador compatible para la API antigua; `progression.ts` indexa las recompensas de campaña; y almacenamiento/sincronización consultan ese mismo catálogo.
+
+Se mantienen como reglas técnicas o contratos públicos: los umbrales numéricos de nivel (`0`, `50`, `125`), los IDs union de `MvpSession`, los IDs de acciones y flags de `altar.ts`, y textos de sistema que no representan contenido de campaña. No se han modificado `GameScene.ts`, los loaders/JSON ni los tests de contenido.
+
+## Contrato de configuración
 
 Un nivel debe poder describirse con un documento similar a este:
 
@@ -85,6 +91,10 @@ Un nivel debe poder describirse con un documento similar a este:
 
 El formato de niveles es un contrato versionado. El mapa de campaña usa `schemaVersion: 1` y exige IDs únicos, salidas declaradas y conexiones que apunten a zonas, salidas y entradas existentes.
 
+Las zonas que usan contenido narrativo adicional pueden declarar `npcs`, `dialogues`, `relics`, `enemies`, `rewards` y `routeChoices`. Un NPC referencia su objeto espacial y sus diálogos; los diálogos usan `minTrust` y `nextTrust`; reliquias y enemigos referencian recompensas; y las rutas declaran `minTrust`, requisitos, efectos y recompensas. Los enemigos declaran `maxHp`, `armorClass`, `attackBonus` y daño `d6` con modificador.
+
+El índice `src/content/campaign.ts` carga los dos documentos y expone `levelsByZoneId`, sin duplicar los datos ni depender de `GameScene.ts`.
+
 ## Reglas de parametrización
 
 - Los IDs son únicos dentro de un nivel y nunca se usan como texto visible.
@@ -136,7 +146,7 @@ La futura herramienta debe permitir:
 - [ ] Añadir validación de grafo narrativo.
 - [x] Añadir exportación y carga de mapas de campaña.
 - [ ] Añadir migraciones entre versiones.
-- [ ] Crear un segundo nivel usando únicamente JSON.
+- [x] Crear un segundo nivel usando únicamente JSON.
 
 ### Auditoría de parametrización
 
