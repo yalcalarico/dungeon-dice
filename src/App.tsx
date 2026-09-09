@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react'
 import { GameScene, type ScenePerformanceSnapshot } from './game/GameScene'
 import { createRandomD20 } from './dice/d20'
+import { createRandomD6 } from './dice/d6'
 import { createNarrativeEntry, type AltarActionId } from './narrative/altar'
 import { transitionGameState } from './state/game-state'
 import { createInitialSession, resetSession, transitionSession, type Session } from './state/session'
 import { cryptOfLunargenta } from './content'
 import { archetypes, attributeModifier, createCharacter, pointBuyCost, rollDndAttributes, validateDndPointBuy, type Character, type CharacterAttributes } from './characters/character'
-import { applyMvpAction, createMvpSession, type InventoryItem, type MvpAction, type MvpSession } from './mvp/campaign'
+import { applyMvpAction, createMvpSession, doesAttackHit, SENTINEL_ATTACK_BONUS, SENTINEL_ARMOR_CLASS, type InventoryItem, type MvpAction, type MvpSession } from './mvp/campaign'
 import { loadCharacters, loadMvpSession, saveCharacter, saveMvpSession } from './mvp/storage'
 import './App.css'
 
@@ -19,6 +20,7 @@ function App() {
   const sceneRef = useRef<GameScene | null>(null)
   const [session, setSession] = useState<Session>(createInitialSession)
   const [roller] = useState(createRandomD20)
+  const [damageRoller] = useState(createRandomD6)
   const [action, setAction] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -37,6 +39,10 @@ function App() {
   const [creationStats, setCreationStats] = useState<CharacterAttributes>(() => ({ ...archetypes[0].attributes }))
   const [characterStatsOpen, setCharacterStatsOpen] = useState(false)
   const [selectedEntity, setSelectedEntity] = useState<'ash-sentinel' | null>(null)
+  const [pendingAttackRoll, setPendingAttackRoll] = useState<{ roll: number; die: number; modifier: number } | null>(null)
+  const [lastDamageRoll, setLastDamageRoll] = useState<number | null>(null)
+  const [autoD20, setAutoD20] = useState(false)
+  const [autoD6, setAutoD6] = useState(false)
   const [performanceSnapshot, setPerformanceSnapshot] = useState<ScenePerformanceSnapshot | null>(null)
   const rollTimerRef = useRef<number | null>(null)
   const combatTimerRef = useRef<number | null>(null)
@@ -59,6 +65,8 @@ function App() {
     saveCharacter(candidate)
     setCharacters(loadCharacters())
     setCharacter(candidate)
+    setPendingAttackRoll(null)
+    setLastDamageRoll(null)
     setCreationOpen(false)
     setMvp(loadMvpSession(candidate.id) ?? createMvpSession(candidate))
     const fresh = createInitialSession()
@@ -82,7 +90,7 @@ function App() {
     if (action.type === 'resolve-attack') {
       const enemyDamage = Math.max(0, mvp.encounter.enemyHp - next.encounter.enemyHp)
       const playerDamage = Math.max(0, mvp.character.resources.hp - next.character.resources.hp)
-      sceneRef.current?.triggerCombatFeedback('player', action.roll >= 10)
+      sceneRef.current?.triggerCombatFeedback('player', enemyDamage > 0)
       if (enemyDamage > 0) sceneRef.current?.showCombatNotification('enemy', enemyDamage, 'debuff')
       if (next.character.resources.hp < mvp.character.resources.hp) {
         sceneRef.current?.showCombatNotification('player', playerDamage, 'debuff')
@@ -184,7 +192,7 @@ function App() {
   const log: LogEntry[] = gameState.entries
   const visibleLog = log
   const lastRoll = gameState.lastRoll
-  const displayedRoll = lastRoll?.total ?? mvp?.lastRoll ?? null
+  const displayedRoll = pendingAttackRoll?.roll ?? lastRoll?.total ?? mvp?.lastRoll ?? null
   const pendingCheck = gameState.pendingCheck !== null || mvp?.encounter.awaitingRoll === true
   const inCrypt = mvp?.zoneId === 'crypt-of-lunargenta'
   const nearAltar = inCrypt && interactionTarget === 'altar'
@@ -213,13 +221,18 @@ function App() {
   const outcomeVisible = outcomeKey !== null && dismissedOutcomeKey !== outcomeKey
   const outcomeType = gameState.phase === 'victory' ? 'victory' : gameState.phase === 'failure' || gameState.lastRollOutcome === 'failure' ? 'failure' : 'success'
 
-  const rollDice = () => {
+  const rollD20 = () => {
     if (isRolling) return
     const resolvingEncounter = mvp?.encounter.awaitingRoll === true
+    if (resolvingEncounter && pendingAttackRoll) return
     setIsRolling(true)
     rollTimerRef.current = window.setTimeout(() => {
       try {
-        if (resolvingEncounter) { const roll = roller.roll(attributeModifier(character?.attributes.strength ?? 10)); performMvpAction({ type: 'resolve-attack', roll: roll.total, die: roll.value, modifier: roll.modifier }) }
+        if (resolvingEncounter) {
+          const roll = roller.roll(attributeModifier(character?.attributes.strength ?? 10))
+          if (doesAttackHit(roll.value, roll.total, SENTINEL_ARMOR_CLASS)) { setLastDamageRoll(null); setPendingAttackRoll({ roll: roll.total, die: roll.value, modifier: roll.modifier }) }
+          else { setLastDamageRoll(null); performMvpAction({ type: 'resolve-attack', roll: roll.total, die: roll.value, modifier: roll.modifier }) }
+        }
         else setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'roll-dice' }, roller)))
       } catch {
         setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message: 'La tirada no pudo resolverse. La acción sigue disponible para reintentar.', }, roller)))
@@ -229,6 +242,38 @@ function App() {
       }
     }, 720)
   }
+
+  const rollD6 = () => {
+    if (isRolling || !pendingAttackRoll) return
+    setIsRolling(true)
+    rollTimerRef.current = window.setTimeout(() => {
+      try {
+        const damageRoll = damageRoller.roll().value
+        setLastDamageRoll(damageRoll)
+        performMvpAction({ type: 'resolve-attack', ...pendingAttackRoll, damageRoll })
+        setPendingAttackRoll(null)
+      } finally {
+        setIsRolling(false)
+        rollTimerRef.current = null
+      }
+    }, 560)
+  }
+
+  const triggerD20 = useEffectEvent(rollD20)
+  const triggerD6 = useEffectEvent(rollD6)
+
+  useEffect(() => {
+    const waitingForD20 = gameState.pendingCheck !== null || (mvp?.encounter.awaitingRoll === true && pendingAttackRoll === null)
+    if (!autoD20 || !waitingForD20 || isRolling) return
+    const timer = window.setTimeout(() => triggerD20(), 280)
+    return () => window.clearTimeout(timer)
+  }, [autoD20, gameState.pendingCheck, isRolling, mvp?.encounter.awaitingRoll, pendingAttackRoll])
+
+  useEffect(() => {
+    if (!autoD6 || !pendingAttackRoll || isRolling) return
+    const timer = window.setTimeout(() => triggerD6(), 280)
+    return () => window.clearTimeout(timer)
+  }, [autoD6, isRolling, pendingAttackRoll])
 
   const resetGame = () => {
     if (rollTimerRef.current !== null) {
@@ -244,6 +289,8 @@ function App() {
       turnTimerRef.current = null
     }
     sceneRef.current?.reset()
+    setPendingAttackRoll(null)
+    setLastDamageRoll(null)
     const freshSession = resetSession()
     if (character) {
       const archetype = archetypes.find((candidate) => candidate.id === character.archetypeId)
@@ -295,9 +342,11 @@ function App() {
   useEffect(() => {
     if (!mvp || mvp.encounter.status !== 'active' || mvp.encounter.turn !== 'enemy') return
     turnTimerRef.current = window.setTimeout(() => {
-      const next = applyMvpAction(mvp, { type: 'resolve-enemy-turn' })
-      const damage = Math.max(0, mvp.character.resources.hp - next.character.resources.hp)
-      sceneRef.current?.triggerCombatFeedback('enemy', true)
+       const attackRoll = roller.roll(SENTINEL_ATTACK_BONUS)
+       const damageRoll = damageRoller.roll().value
+       const next = applyMvpAction(mvp, { type: 'resolve-enemy-turn', roll: attackRoll.total, die: attackRoll.value, modifier: attackRoll.modifier, damageRoll })
+       const damage = Math.max(0, mvp.character.resources.hp - next.character.resources.hp)
+       if (damage > 0) sceneRef.current?.triggerCombatFeedback('player', true)
       if (damage > 0) sceneRef.current?.showCombatNotification('player', damage, 'debuff')
       setMvp(next)
       const died = next.character.resources.hp <= 0
@@ -308,7 +357,7 @@ function App() {
       turnTimerRef.current = null
     }, 850)
     return () => { if (turnTimerRef.current !== null) window.clearTimeout(turnTimerRef.current) }
-  }, [mvp])
+  }, [damageRoller, mvp, roller])
 
   return (
     <main className="app-shell">
@@ -354,13 +403,13 @@ function App() {
       {visibleSelectedEntity === 'ash-sentinel' && mvp && <aside className="target-stats-panel" aria-label="Estadísticas del Centinela de ceniza">
         <div className="target-stats-header"><span>ENEMIGO</span><button type="button" aria-label="Cerrar estadísticas del enemigo" onClick={() => setSelectedEntity(null)}>×</button></div>
         <h2>{sentinelStats.name}</h2><p>HP {mvp.encounter.enemyHp}/{mvp.encounter.enemyMaxHp} · CA {sentinelStats.armorClass}</p>
-        <div className="attribute-list">{attributeLabels.map(([key, label]) => <span key={key}><b>{label}</b>{sentinelStats[key]}</span>)}</div>
+         <div className="attribute-list">{attributeLabels.map(([key, label]) => { const modifier = attributeModifier(sentinelStats[key]); return <span key={key}><b>{label}</b><strong>{sentinelStats[key]}</strong><small>{modifier >= 0 ? '+' : ''}{modifier}</small></span> })}</div>
       </aside>}
 
       <aside className="left-rail" aria-label="Estado del personaje">
         {character ? <button type="button" className="portrait" aria-label="Mostrar estadísticas del personaje" aria-expanded={characterStatsOpen} onClick={() => setCharacterStatsOpen((open) => !open)}><span>✧</span></button> : <div className="portrait"><span>✧</span></div>}
         {character && mvp && <button type="button" className="character-identity" aria-expanded={characterStatsOpen} onClick={() => setCharacterStatsOpen((open) => !open)}><strong>{character.name}</strong><small>{character.archetypeId}</small><small>XP {mvp.experience} · MOCHILA {mvp.inventory.reduce((total, item) => total + item.quantity, 0)}</small></button>}
-        {character && characterStatsOpen && <aside className="character-stats-popover" aria-label="Estadísticas del personaje"><div className="target-stats-header"><span>PERSONAJE</span><button type="button" aria-label="Cerrar estadísticas del personaje" onClick={() => setCharacterStatsOpen(false)}>×</button></div><h2>{character.name}</h2><p>Nivel {mvp?.level ?? character.level} · HP {gameState.player.hp}/{gameState.player.maxHp}</p><div className="attribute-list">{attributeLabels.map(([key, label]) => <span key={key}><b>{label}</b>{character.attributes[key]}</span>)}</div></aside>}
+         {character && characterStatsOpen && <aside className="character-stats-popover" aria-label="Estadísticas del personaje"><div className="target-stats-header"><span>PERSONAJE</span><button type="button" aria-label="Cerrar estadísticas del personaje" onClick={() => setCharacterStatsOpen(false)}>×</button></div><h2>{character.name}</h2><p>Nivel {mvp?.level ?? character.level} · HP {gameState.player.hp}/{gameState.player.maxHp}</p><div className="attribute-list">{attributeLabels.map(([key, label]) => { const modifier = attributeModifier(character.attributes[key]); return <span key={key}><b>{label}</b><strong>{character.attributes[key]}</strong><small>{modifier >= 0 ? '+' : ''}{modifier}</small></span> })}</div></aside>}
         <div className="rail-divider" />
         <div className="stat"><span>HP</span><strong>{String(gameState.player.hp).padStart(2, '0')}</strong><i className="bar hp" style={{ '--fill': `${hpPercent}%` } as CSSProperties} /></div>
         <div className="stat"><span>MP</span><strong>{String(gameState.player.mp).padStart(2, '0')}</strong><i className="bar mp" style={{ '--fill': `${mpPercent}%` } as CSSProperties} /></div>
@@ -413,7 +462,18 @@ function App() {
 
        {outcomeVisible && <div className={`outcome-banner ${outcomeType}`} role="status" onClick={() => setDismissedOutcomeKey(outcomeKey)}><button type="button" className="outcome-close" aria-label="Cerrar mensaje" onClick={(event) => { event.stopPropagation(); setDismissedOutcomeKey(outcomeKey) }}>×</button><span>{outcomeType === 'victory' ? 'VICTORIA' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'HAS MUERTO' : 'LA CRIPTA TE RECHAZA' : 'PRUEBA SUPERADA'}</span><p>{outcomeType === 'victory' ? 'Has completado todos los mapas de la campaña.' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'Tu vida llegó a cero. Puedes reintentar el encuentro desde el último punto seguro.' : 'La pista se ha perdido, pero esta historia todavía puede crecer.' : 'La tirada ha superado la dificultad. El altar revela un nuevo camino.'}</p></div>}
 
-       <div className={`dice-widget${pendingCheck ? ' pending' : ''}`}><div className="dice-heading"><span>DADOS</span><b>{displayedRoll !== null ? `D20 · ${displayedRoll}` : 'D20 · LISTO'}</b></div><button className={`die${isRolling ? ' rolling' : ''}`} onClick={rollDice} disabled={isRolling} aria-label={pendingCheck ? 'Lanzar el dado para resolver la acción' : 'Lanzar dado de veinte caras'}><span>{isRolling ? '···' : lastRoll?.value ?? mvp?.lastDie ?? '—'}</span></button><p>{isRolling ? 'La fortuna gira...' : pendingCheck ? 'Lanza el D20 para resolver la acción' : 'Click para lanzar'}</p></div>
+       <div className={`dice-widget${pendingCheck ? ' pending' : ''}`}>
+         <div className="dice-heading"><span>DADOS</span><b>{displayedRoll !== null ? `D20 · ${displayedRoll}` : 'D20 · LISTO'}</b></div>
+         <div className="dice-row">
+           <div className="dice-column"><button className={`die${isRolling && !pendingAttackRoll ? ' rolling' : ''}`} onClick={rollD20} disabled={isRolling || pendingAttackRoll !== null} aria-label="Lanzar dado de veinte caras"><span>{isRolling && !pendingAttackRoll ? '···' : pendingAttackRoll?.die ?? lastRoll?.value ?? mvp?.lastDie ?? '—'}</span></button><small>D20</small></div>
+           <div className="dice-column"><button className={`die damage-die${isRolling && pendingAttackRoll ? ' rolling' : ''}${pendingAttackRoll ? ' ready' : ''}`} onClick={rollD6} disabled={isRolling || pendingAttackRoll === null} aria-label="Lanzar dado de seis caras para daño"><span>{isRolling && pendingAttackRoll ? '···' : lastDamageRoll ?? '—'}</span></button><small>D6 DAÑO</small></div>
+         </div>
+         <p>{isRolling ? 'La fortuna gira...' : pendingAttackRoll ? 'Impacto confirmado: lanza 1D6 para calcular el daño.' : pendingCheck ? 'Lanza el D20 para resolver la acción.' : 'Elige una prueba para lanzar.'}</p>
+         <div className="dice-options">
+           <label><input type="checkbox" checked={autoD20} onChange={(event) => setAutoD20(event.target.checked)} /> AUTO D20</label>
+           <label><input type="checkbox" checked={autoD6} onChange={(event) => setAutoD6(event.target.checked)} /> AUTO D6</label>
+         </div>
+       </div>
       <aside className="controls" aria-label="Controles rápidos"><span><b>WASD</b> MOVER</span><span><b>DRAG</b> ROTAR</span><span><b>SCROLL</b> ZOOM</span></aside>
       <div className="corner-note">VOL. I <span>•</span> EL UMBRAL</div>
     </main>

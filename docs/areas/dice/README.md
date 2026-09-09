@@ -24,9 +24,11 @@ Proporcionar un sistema d20 determinista, aislado del navegador y de Three.js, q
 - [x] Integrar reintentos con coste de recurso y resolución posterior.
 - [x] Añadir presentación detallada del resultado y dificultad.
 - [x] Añadir animación y estado visual de lanzamiento.
-- [ ] Añadir configuración de atributos del personaje.
+- [x] Añadir configuración de atributos del personaje.
 - [ ] Añadir tests automatizados de distribución y casos extremos.
-- [ ] Preparar extensión para combate.
+- [x] Preparar extensión para combate.
+
+La extensión de combate usa Fuerza para ataques del jugador, Destreza para su CA, CA 14 para el Centinela, críticos naturales y daño variable de 1d6 más modificador. El enemigo tira con bonificador +4 y puede fallar contra la CA del personaje.
 
 ## Criterios de aceptación
 
