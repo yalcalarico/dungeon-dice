@@ -124,7 +124,7 @@ function App() {
       const died = next.character.resources.hp <= 0
       const recoveredFromDeath = action.type === 'reset-encounter' && current.gameState.phase === 'failure'
       const campaignMessages = action.type === 'travel' ? [] : next.log.slice(mvp.log.length)
-      const playerResources = changedZone ? current.gameState.player : { ...next.character.resources, attributes: current.gameState.player.attributes }
+       const playerResources = changedZone ? { ...current.gameState.player, attributes: next.character.attributes } : { ...next.character.resources, attributes: next.character.attributes }
       const entries = [...nextGameState.entries, ...campaignMessages.map((message) => createNarrativeEntry('Sistema', message, action.type === 'resolve-attack' || action.type === 'resolve-enemy-turn' ? 'gold' : undefined))]
       const finalGameState = died
         ? { ...nextGameState, phase: 'failure' as const, movementLocked: true, player: playerResources, entries: [...entries, createNarrativeEntry('Narrador', 'Tu vida llega a cero. Has muerto, pero puedes reintentar el encuentro desde el último punto seguro.', 'danger')] }
@@ -236,7 +236,7 @@ function App() {
     rollTimerRef.current = window.setTimeout(() => {
       try {
         if (resolvingEncounter) {
-          const roll = roller.roll(attributeModifier(character?.attributes.strength ?? 10))
+          const roll = roller.roll(attributeModifier(mvp?.character.attributes.strength ?? 10))
           if (doesAttackHit(roll.value, roll.total, SENTINEL_ARMOR_CLASS)) { setLastDamageRoll(null); setPendingAttackRoll({ roll: roll.total, die: roll.value, modifier: roll.modifier }) }
           else { setLastDamageRoll(null); performMvpAction({ type: 'resolve-attack', roll: roll.total, die: roll.value, modifier: roll.modifier }) }
         }

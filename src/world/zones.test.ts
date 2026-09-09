@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createInitialGameState } from '../state/game-state'
-import { starterCampaignMap, transitionZone } from './zones'
+import { loadCampaignMap, starterCampaignMap, transitionZone, validateCampaignMap } from './zones'
 
 describe('zone transitions', () => {
   it('moves to a connected zone and remembers it', () => {
@@ -15,5 +15,12 @@ describe('zone transitions', () => {
     const initial = createInitialGameState()
 
     expect(transitionZone(initial, { connectionId: 'courtyard-to-crypt', fromExitId: 'tower-path' }, starterCampaignMap)).toBe(initial)
+  })
+
+  it('validates and loads exported campaign maps', () => {
+    const exported = JSON.parse(JSON.stringify({ schemaVersion: 1, ...starterCampaignMap }))
+    expect(validateCampaignMap(exported).valid).toBe(true)
+    expect(loadCampaignMap(exported).zones).toHaveLength(2)
+    expect(validateCampaignMap({ zones: [], connections: [{ fromZoneId: 'missing' }] }).valid).toBe(false)
   })
 })
