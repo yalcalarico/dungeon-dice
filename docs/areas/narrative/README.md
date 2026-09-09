@@ -41,7 +41,7 @@ La implementación actual es específica del altar. La parametrización de accio
 - [x] Permitir reintentar una prueba fallida mediante un coste de vida parametrizable.
 - [ ] Migrar las acciones actuales a configuración declarativa JSON.
 - [ ] Implementar ramificación por flags.
-- [ ] Escribir la ruta completa del altar a la puerta.
+- [x] Escribir la ruta completa del altar a la puerta.
 - [ ] Añadir tests de sinónimos y acciones imposibles.
 
 ## Criterios de aceptación

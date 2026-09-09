@@ -9,6 +9,12 @@ type InteractionTargetChange = (target: InteractionTarget | null) => void
 type EntitySelectionChange = (entityId: string | null) => void
 type Collider = { x: number; z: number; halfX: number; halfZ: number }
 type CombatNotification = { sprite: THREE.Sprite; material: THREE.SpriteMaterial; texture: THREE.CanvasTexture; elapsed: number; target: 'player' | 'enemy' }
+export type ScenePerformanceSnapshot = PerformanceSnapshot & {
+  readonly drawCalls: number
+  readonly triangles: number
+  readonly geometries: number
+  readonly textures: number
+}
 
 export class GameScene {
   private readonly host: HTMLElement
@@ -19,6 +25,7 @@ export class GameScene {
   private readonly camera = new THREE.OrthographicCamera(-10, 10, 10, -10, .1, 100)
   private readonly renderer: THREE.WebGLRenderer
   private readonly world = new THREE.Group()
+  private readonly wetPatches = new THREE.Group()
   private readonly courtyard = new THREE.Group()
   private readonly enemy = new THREE.Group()
   private readonly combatNotifications: CombatNotification[] = []
@@ -211,11 +218,21 @@ export class GameScene {
     this.exitDoor.visible = flags.exitOpened !== true
   }
 
-  getPerformanceSnapshot(): PerformanceSnapshot { return this.performanceTracker.getSnapshot() }
+  getPerformanceSnapshot(): ScenePerformanceSnapshot {
+    const snapshot = this.performanceTracker.getSnapshot()
+    return {
+      ...snapshot,
+      drawCalls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles,
+      geometries: this.renderer.info.memory.geometries,
+      textures: this.renderer.info.memory.textures,
+    }
+  }
 
   private buildWorld() {
     this.scene.fog = new THREE.Fog(0x111719, 17, 38)
     this.scene.add(this.world)
+    this.world.add(this.wetPatches)
     this.scene.add(new THREE.HemisphereLight(0x9eafae, 0x101517, 1.7))
     const moon = new THREE.DirectionalLight(0xa9c1c7, 2.2)
     moon.position.set(-10, 18, 7); moon.castShadow = true; moon.shadow.mapSize.set(1024, 1024); moon.shadow.camera.left = -16; moon.shadow.camera.right = 16; moon.shadow.camera.top = 16; moon.shadow.camera.bottom = -16; this.scene.add(moon)
@@ -431,7 +448,7 @@ export class GameScene {
       patch.rotation.x = -Math.PI / 2
       patch.rotation.z = rotation
       patch.scale.set(scaleX, scaleZ, 1)
-      this.world.add(patch)
+      this.wetPatches.add(patch)
     }
   }
 
@@ -454,7 +471,7 @@ export class GameScene {
   private setCameraToPlayer() { const target = this.cameraTarget.copy(this.player.position); this.camera.position.set(Math.sin(this.yaw) * this.distance, this.distance * this.pitch, Math.cos(this.yaw) * this.distance).add(target); this.camera.lookAt(target.x, .2, target.z) }
   private updateCamera(delta: number) { const target = this.cameraTarget.copy(this.player.position); const position = this.cameraPosition.set(Math.sin(this.yaw) * this.distance, this.distance * this.pitch, Math.cos(this.yaw) * this.distance).add(target); this.camera.position.lerp(position, 1 - Math.pow(.0008, delta)); this.camera.lookAt(target.x, .2, target.z) }
   private updateRain(delta: number) { if (!this.rain) return; for (let index = 0; index < this.activeRainCount; index++) { const offset = index * 3; this.rainPositions[offset + 1] -= this.rainVelocities[index] * delta; if (this.rainPositions[offset + 1] < .2) this.rainPositions[offset + 1] = 7.3 + (index % 7) * .35 } const position = this.rainGeometry?.getAttribute('position'); if (position) position.needsUpdate = true }
-  private updateQuality(delta: number) { this.qualityCheckElapsed += delta; if (this.qualityCheckElapsed < .5) return; this.qualityCheckElapsed = 0; const recommendation = this.qualityController.update(this.performanceTracker.getSnapshot()); if (recommendation.level === this.qualityLevel) return; this.qualityLevel = recommendation.level; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, recommendation.settings.pixelRatio)); this.renderer.shadowMap.enabled = recommendation.settings.shadows; this.activeRainCount = Math.floor(this.rainVelocities.length * recommendation.settings.rainDensity); if (this.rainGeometry) this.rainGeometry.setDrawRange(0, this.activeRainCount) }
+  private updateQuality(delta: number) { this.qualityCheckElapsed += delta; if (this.qualityCheckElapsed < .5) return; this.qualityCheckElapsed = 0; const recommendation = this.qualityController.update(this.performanceTracker.getSnapshot()); if (recommendation.level === this.qualityLevel) return; this.qualityLevel = recommendation.level; this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, recommendation.settings.pixelRatio)); this.renderer.shadowMap.enabled = recommendation.settings.shadows; this.wetPatches.visible = recommendation.settings.puddles; this.activeRainCount = Math.floor(this.rainVelocities.length * recommendation.settings.rainDensity); if (this.rainGeometry) this.rainGeometry.setDrawRange(0, this.activeRainCount) }
   private updateCombatFeedback(delta: number) { if (!this.combatFeedbackTarget || this.combatFeedbackTime <= 0) return; this.combatFeedbackTime = Math.max(0, this.combatFeedbackTime - delta); const progress = 1 - this.combatFeedbackTime / .55; const pulse = Math.sin(progress * Math.PI); if (this.combatFeedbackTarget === 'player') this.player.rotation.z = Math.sin(progress * Math.PI * 8) * .08 * (1 - progress); else { this.enemy.position.x = 2 - pulse * .55; this.enemy.scale.setScalar(1 + pulse * .12) } if (this.combatFeedbackTime === 0) { this.combatFeedbackTarget = null; this.enemy.position.x = 2; this.enemy.scale.setScalar(1); this.player.rotation.z = 0 } }
   private updateCombatNotifications(delta: number) { for (let index = this.combatNotifications.length - 1; index >= 0; index--) { const notification = this.combatNotifications[index]; notification.elapsed += delta; const anchor = notification.target === 'player' ? this.player : this.enemy; notification.sprite.position.set(anchor.position.x, anchor.position.y + (notification.target === 'player' ? 2 : 3), anchor.position.z); notification.sprite.position.y += notification.elapsed * .45; notification.material.opacity = notification.elapsed < 1.8 ? 1 : THREE.MathUtils.clamp((3 - notification.elapsed) / 1.2, 0, 1); if (notification.elapsed >= 3) { this.world.remove(notification.sprite); notification.texture.dispose(); notification.material.dispose(); this.combatNotifications.splice(index, 1) } } }
   private updateEnemyDefeat(delta: number) { if (this.enemyDefeatTime <= 0) return; this.enemyDefeatTime = Math.max(0, this.enemyDefeatTime - delta); const progress = 1 - this.enemyDefeatTime / 1.2; this.enemy.scale.setScalar(Math.max(0, 1 - progress)); this.enemy.rotation.y += delta * 5; if (this.enemyDefeatTime === 0) { this.enemy.visible = false; this.enemy.scale.setScalar(1) } }
