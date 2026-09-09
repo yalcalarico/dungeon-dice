@@ -88,6 +88,18 @@ describe('MVP campaign rules', () => {
     expect(traveled.character.resources.hp).toBe(4)
   })
 
+  it('restores the latest zone checkpoint after defeat', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = { ...session, character: { ...session.character, resources: { ...session.character.resources, hp: 1 } } }
+    session = applyMvpAction(session, { type: 'start-encounter' })
+    session = applyMvpAction(session, { type: 'resolve-attack', roll: 1, die: 1, modifier: 2 })
+    const defeated = applyMvpAction(session, { type: 'resolve-enemy-turn', roll: 20, die: 20, modifier: 4, damageRoll: 6 })
+    const reset = applyMvpAction(defeated, { type: 'reset-encounter' })
+
+    expect(reset.character.resources.hp).toBe(character.resources.hp)
+    expect(reset.zoneId).toBe('ashen-courtyard')
+  })
+
   it('uses strength, armor class and variable damage for player attacks', () => {
     let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
     session = applyMvpAction(session, { type: 'start-encounter' })

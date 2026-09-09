@@ -53,6 +53,7 @@ function normalizeMvpSession(value: unknown, characterId?: string): MvpSession |
     visitedZoneIds: [...new Set(value.visitedZoneIds)],
     npcTrust: Math.max(0, Math.min(2, Math.floor(npcTrust))),
     routeChoice: value.routeChoice === 'relic' || value.routeChoice === 'direct' ? value.routeChoice : null,
+    checkpoint: normalizeCheckpoint(value.checkpoint, zoneId, character.resources.hp),
     inventory,
     equippedItemId: value.equippedItemId === 'moon-potion' || value.equippedItemId === 'ash-key' ? value.equippedItemId : null,
     inventoryCapacity: positiveNumber(value.inventoryCapacity, INVENTORY_CAPACITY),
@@ -94,6 +95,13 @@ function normalizeInventory(value: unknown): InventoryItem[] | null {
 
 function validateNormalizedSession(session: MvpSession): boolean {
   return validateCharacter(session.character) && session.inventory.every((item) => item.quantity > 0) && session.encounter.enemyMaxHp > 0
+}
+
+function normalizeCheckpoint(value: unknown, fallbackZoneId: MvpSession['zoneId'], fallbackHp: number): MvpSession['checkpoint'] {
+  if (!isRecord(value)) return { zoneId: fallbackZoneId, hp: fallbackHp }
+  const zoneId = value.zoneId === 'ashen-courtyard' || value.zoneId === 'crypt-of-lunargenta' ? value.zoneId : fallbackZoneId
+  const hp = typeof value.hp === 'number' && Number.isFinite(value.hp) ? Math.max(1, Math.min(fallbackHp, value.hp)) : fallbackHp
+  return { zoneId, hp }
 }
 
 function valueOfEncounterStatus(value: unknown): MvpSession['encounter']['status'] { return value === 'active' || value === 'victory' || value === 'defeat' ? value : 'idle' }

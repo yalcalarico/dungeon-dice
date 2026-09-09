@@ -16,6 +16,7 @@ export type MvpSession = {
   visitedZoneIds: string[]
   npcTrust: number
   routeChoice: RouteChoice | null
+  checkpoint: { zoneId: MvpSession['zoneId']; hp: number }
   inventory: InventoryItem[]
   equippedItemId: InventoryItem['id'] | null
   inventoryCapacity: number
@@ -52,6 +53,7 @@ export function createMvpSession(character: Character): MvpSession {
     visitedZoneIds: ['crypt-of-lunargenta'],
     npcTrust: 0,
     routeChoice: null,
+    checkpoint: { zoneId: 'crypt-of-lunargenta', hp: character.resources.hp },
     inventory,
     equippedItemId: null,
     inventoryCapacity: INVENTORY_CAPACITY,
@@ -69,7 +71,8 @@ export function createMvpSession(character: Character): MvpSession {
 export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSession {
   if (action.type === 'travel') {
     if (session.zoneId === action.zoneId) return session
-    return append({ ...session, zoneId: action.zoneId, visitedZoneIds: session.visitedZoneIds.includes(action.zoneId) ? session.visitedZoneIds : [...session.visitedZoneIds, action.zoneId] }, `Llegas a ${action.zoneId === 'ashen-courtyard' ? 'el Patio de Ceniza' : 'la Cripta de Lunargenta'}.`)
+    const next = { ...session, zoneId: action.zoneId, checkpoint: { zoneId: action.zoneId, hp: session.character.resources.hp }, visitedZoneIds: session.visitedZoneIds.includes(action.zoneId) ? session.visitedZoneIds : [...session.visitedZoneIds, action.zoneId] }
+    return append(next, `Llegas a ${action.zoneId === 'ashen-courtyard' ? 'el Patio de Ceniza' : 'la Cripta de Lunargenta'}.`)
   }
   if (action.type === 'talk-npc') {
     if (session.zoneId !== 'ashen-courtyard') return append(session, 'Iria no está aquí.')
@@ -86,7 +89,7 @@ export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSessi
     return append({ ...session, encounter: { status: 'active', enemyHp: 18, enemyMaxHp: 18, turns: 0, awaitingRoll: true, turn: 'player', pendingEnemyDamage: 0 } }, 'El centinela de ceniza despierta. Lanza el D20 para comenzar tu turno.')
   }
   if (action.type === 'reset-encounter') {
-    const character = session.encounter.status === 'defeat' ? { ...session.character, resources: { ...session.character.resources, hp: session.character.resources.maxHp } } : session.character
+    const character = session.encounter.status === 'defeat' ? { ...session.character, resources: { ...session.character.resources, hp: Math.max(1, Math.min(session.character.resources.maxHp, session.checkpoint.hp)) } } : session.character
     return append({ ...session, character, encounter: { status: 'idle', enemyHp: 18, enemyMaxHp: 18, turns: 0, awaitingRoll: false, turn: 'player', pendingEnemyDamage: 0 } }, session.encounter.status === 'defeat' ? 'Vuelves al último punto seguro. Recuperas tus fuerzas y el encuentro está listo para reintentarse.' : 'El encuentro vuelve al último punto seguro.')
   }
   if (action.type === 'retreat') {
