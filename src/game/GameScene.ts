@@ -325,7 +325,7 @@ export class GameScene {
     npcBody.castShadow = true
     npcHead.castShadow = true
     group.add(npcBody, npcHead)
-    this.addInteraction(level, object, npc?.name ?? object.id, object.position, npc?.id)
+    this.addInteraction(level, object, npc?.name ?? object.id, object.position)
   }
 
   private makeRelic(level: LevelConfig, object: LevelObject, group: THREE.Group) {
@@ -338,7 +338,7 @@ export class GameScene {
     relic.castShadow = true
     group.add(pedestal, relic)
     const metadata = level.relics?.find((candidate) => candidate.objectId === object.id)
-    this.addInteraction(level, object, metadata?.name ?? object.id, object.position, metadata?.id)
+    this.addInteraction(level, object, metadata?.name ?? object.id, object.position)
   }
 
   private makeEnemy(level: LevelConfig, object: LevelObject, group: THREE.Group) {
@@ -379,7 +379,7 @@ export class GameScene {
     this.enemy.userData.selectableId = metadata.id
     group.add(this.enemy)
     this.selectableObjects.push(this.enemy)
-    this.addInteraction(level, object, metadata.name, object.position, metadata.id)
+    this.addInteraction(level, object, metadata.name, object.position)
   }
 
   private block(x: number, y: number, z: number, sx: number, sy: number, sz: number, material: THREE.Material, group: THREE.Group, zoneId: string) {
@@ -396,7 +396,7 @@ export class GameScene {
     const stone = new THREE.MeshStandardMaterial({ color: 0x555b53, roughness: .7 }); const gold = new THREE.MeshStandardMaterial({ color: 0x9f8359, emissive: 0x392714, emissiveIntensity: .5, roughness: .3 })
     this.block(altar.position.x, .6, altar.position.z, 2.6, 1.2, 1.6, stone, group, level.id); this.block(altar.position.x, 1.35, altar.position.z, 1.45, .3, .9, gold, group, level.id)
     const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, .04, 6, 32), new THREE.MeshBasicMaterial({ color: 0xc6a776, transparent: true, opacity: .55 })); ring.rotation.x = -Math.PI / 2; ring.position.set(altar.position.x, 1.55, altar.position.z); group.add(ring)
-    this.addInteraction(level, altar, altar.id, altar.position, altar.type === 'altar' ? 'altar' : undefined)
+    this.addInteraction(level, altar, altar.id, altar.position)
   }
 
   private makeExitDoor(level: LevelConfig, exit: LevelObject, group: THREE.Group) {
