@@ -139,9 +139,9 @@ Este documento es el checklist operativo para convertir el demo actual en el MVP
 - [x] S0. Contrato de estado y reglas de transición.
 - [x] S1. Estado serializable y límites.
 - [x] S2. Validador de contenido.
-- [ ] S3. Mapa ampliado y transiciones (fundación implementada).
-- [ ] S4. Authoring mínimo de campaña (fundación implementada).
-- [ ] S5. Personajes (fundación implementada).
+- [ ] S3. Mapa ampliado y transiciones (contrato y validación implementados; montaje 3D JSON pendiente).
+- [ ] S4. Authoring mínimo de campaña (exportación y carga de mapa implementadas; CLI pendiente).
+- [ ] S5. Personajes (fuente de atributos unificada; migración completa pendiente).
 - [ ] S6-S10. Parciales; ver el avance detallado más abajo.
 - [ ] S11-S15. Parciales; S11 ya tiene retirada y reset básicos.
 
