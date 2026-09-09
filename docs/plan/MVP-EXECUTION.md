@@ -143,7 +143,7 @@ Este documento es el checklist operativo para convertir el demo actual en el MVP
 - [ ] S4. Authoring mínimo de campaña (fundación implementada).
 - [ ] S5. Personajes (fundación implementada).
 - [ ] S6-S10. Parciales; ver el avance detallado más abajo.
-- [ ] S11-S15. Pendientes.
+- [ ] S11-S15. Parciales; S11 ya tiene retirada y reset básicos.
 
 ## Avance de slices posteriores
 
@@ -155,6 +155,7 @@ Se implementaron los siguientes sub-slices verificables sin declarar completos s
 - [x] **S8:** usar una tabla versionada de XP, hacer idempotentes los milestones y sincronizar nivel/recompensas del personaje.
 - [x] **S9:** mantener cantidades de inventario coherentes, mostrar capacidad, proteger objetos de misión y añadir equipamiento base.
 - [x] **S10:** añadir diálogo de Iria como datos dependientes de zona y confianza, con progresión limitada y persistente.
+- [x] **S11:** añadir retirada explícita sin recompensas y una decisión de ruta persistente alrededor de Iria.
 
 S6-S10 siguen parciales: faltan guardado manual y checkpoints, runtime declarativo general, tabla de progresión configurable, equipamiento y diálogos definidos desde contenido.
 

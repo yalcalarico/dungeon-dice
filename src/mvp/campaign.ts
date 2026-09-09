@@ -5,6 +5,7 @@ import { awardMilestone, findMilestone } from '../progression/progression'
 
 export type InventoryItem = { id: 'moon-potion' | 'ash-key'; label: string; quantity: number; kind: 'consumable' | 'quest'; equippable?: boolean }
 export type EncounterStatus = 'idle' | 'active' | 'victory' | 'defeat'
+export type RouteChoice = 'relic' | 'direct'
 export const INVENTORY_CAPACITY = 12
 export const SENTINEL_ARMOR_CLASS = 14
 export const SENTINEL_ATTACK_BONUS = 4
@@ -14,6 +15,7 @@ export type MvpSession = {
   zoneId: 'crypt-of-lunargenta' | 'ashen-courtyard'
   visitedZoneIds: string[]
   npcTrust: number
+  routeChoice: RouteChoice | null
   inventory: InventoryItem[]
   equippedItemId: InventoryItem['id'] | null
   inventoryCapacity: number
@@ -30,6 +32,7 @@ export type MvpSession = {
 export type MvpAction =
   | { type: 'travel'; zoneId: MvpSession['zoneId'] }
   | { type: 'talk-npc' }
+  | { type: 'choose-route'; route: RouteChoice }
   | { type: 'inspect-relic' }
   | { type: 'start-encounter' }
   | { type: 'attack' }
@@ -39,6 +42,7 @@ export type MvpAction =
   | { type: 'drop-item'; itemId: InventoryItem['id'] }
   | { type: 'equip-item'; itemId: InventoryItem['id'] }
   | { type: 'reset-encounter' }
+  | { type: 'retreat' }
 
 export function createMvpSession(character: Character): MvpSession {
   const inventory = inventoryFromCharacter(character.inventory)
@@ -47,6 +51,7 @@ export function createMvpSession(character: Character): MvpSession {
     zoneId: 'crypt-of-lunargenta',
     visitedZoneIds: ['crypt-of-lunargenta'],
     npcTrust: 0,
+    routeChoice: null,
     inventory,
     equippedItemId: null,
     inventoryCapacity: INVENTORY_CAPACITY,
@@ -71,6 +76,10 @@ export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSessi
     const dialogue = getDialogueNode(iriaDialogue, session.npcTrust)
     return append({ ...session, npcTrust: Math.max(session.npcTrust, dialogue.nextTrust ?? session.npcTrust) }, dialogue.text)
   }
+  if (action.type === 'choose-route') {
+    if (session.zoneId !== 'ashen-courtyard' || session.npcTrust < 1 || session.routeChoice !== null) return session
+    return append({ ...session, routeChoice: action.route }, action.route === 'relic' ? 'Decides seguir la pista de Iria hacia la reliquia.' : 'Decides avanzar directamente hacia el centinela.')
+  }
   if (action.type === 'inspect-relic') return milestone(session, 'relic-discovered', 25, { id: 'ash-key', label: 'Llave de ceniza', quantity: 1, kind: 'quest', equippable: true }, 'La reliquia revela un fragmento de la historia de Lunargenta.')
   if (action.type === 'start-encounter') {
     if (session.zoneId !== 'ashen-courtyard' || session.encounter.status !== 'idle') return session
@@ -79,6 +88,10 @@ export function applyMvpAction(session: MvpSession, action: MvpAction): MvpSessi
   if (action.type === 'reset-encounter') {
     const character = session.encounter.status === 'defeat' ? { ...session.character, resources: { ...session.character.resources, hp: session.character.resources.maxHp } } : session.character
     return append({ ...session, character, encounter: { status: 'idle', enemyHp: 18, enemyMaxHp: 18, turns: 0, awaitingRoll: false, turn: 'player', pendingEnemyDamage: 0 } }, session.encounter.status === 'defeat' ? 'Vuelves al último punto seguro. Recuperas tus fuerzas y el encuentro está listo para reintentarse.' : 'El encuentro vuelve al último punto seguro.')
+  }
+  if (action.type === 'retreat') {
+    if (session.encounter.status !== 'active') return session
+    return append({ ...session, encounter: { status: 'idle', enemyHp: 18, enemyMaxHp: 18, turns: 0, awaitingRoll: false, turn: 'player', pendingEnemyDamage: 0 } }, 'Te retiras del encuentro sin recibir recompensas. El centinela sigue en guardia.')
   }
   if (action.type === 'use-potion' && session.encounter.status === 'active' && session.encounter.turn === 'enemy') return session
   if (action.type === 'use-potion') {

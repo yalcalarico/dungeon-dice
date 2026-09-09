@@ -48,6 +48,18 @@ describe('MVP campaign rules', () => {
     expect(finished.log.at(-1)).toContain('todo lo que sabe')
   })
 
+  it('persists a route decision and supports retreat without rewards', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'talk-npc' })
+    session = applyMvpAction(session, { type: 'choose-route', route: 'relic' })
+    session = applyMvpAction(session, { type: 'start-encounter' })
+    const retreated = applyMvpAction(session, { type: 'retreat' })
+
+    expect(session.routeChoice).toBe('relic')
+    expect(retreated.encounter.status).toBe('idle')
+    expect(retreated.experience).toBe(0)
+  })
+
   it('keeps inventory quantities and protects quest items', () => {
     let session = applyMvpAction(createMvpSession(character), { type: 'inspect-relic' })
     const blocked = applyMvpAction(session, { type: 'drop-item', itemId: 'ash-key' })

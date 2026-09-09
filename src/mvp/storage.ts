@@ -52,6 +52,7 @@ function normalizeMvpSession(value: unknown, characterId?: string): MvpSession |
     zoneId,
     visitedZoneIds: [...new Set(value.visitedZoneIds)],
     npcTrust: Math.max(0, Math.min(2, Math.floor(npcTrust))),
+    routeChoice: value.routeChoice === 'relic' || value.routeChoice === 'direct' ? value.routeChoice : null,
     inventory,
     equippedItemId: value.equippedItemId === 'moon-potion' || value.equippedItemId === 'ash-key' ? value.equippedItemId : null,
     inventoryCapacity: positiveNumber(value.inventoryCapacity, INVENTORY_CAPACITY),
