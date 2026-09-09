@@ -68,8 +68,10 @@ Construir un demo web jugable de aventura narrativa 3D con Three.js, cámara iso
 
 - El primer bootstrap del repositorio puede publicarse directamente en `main` cuando el propietario lo autorice explícitamente.
 - Después del bootstrap, cada cambio debe comenzar desde `main` en un branch nuevo y descriptivo.
+- Durante una tarea activa se permiten commits locales, pero no hacer `push` ni crear Pull Request mientras el propietario no confirme que el bloque de trabajo está completado.
 - Nunca hacer push directo a `main` para cambios posteriores.
 - Cada branch de trabajo debe publicarse en el remoto y acompañarse de un Pull Request contra `main`.
+- Solo cuando el propietario confirme que el bloque está completado se debe publicar el branch y crear el Pull Request.
 - El agente no debe hacer merge del Pull Request: el merge requiere aprobación explícita del propietario.
 - Antes de crear un Pull Request se deben revisar `git status`, `git diff`, los commits incluidos, el branch base y las verificaciones de `lint`, tests y build.
 - No hacer force-push, reset destructivo ni amend salvo petición explícita.
