@@ -16,6 +16,8 @@ import {
   type NarrativeEntry,
   type Objective,
 } from '../narrative/altar'
+import { cryptOfLunargenta } from '../content'
+import { evaluateRequirements } from '../content/runtime'
 
 export type GamePhase = 'exploration' | 'resolving' | 'paused' | 'victory' | 'failure'
 
@@ -129,7 +131,7 @@ export function transitionGameState(state: GameState, action: GameAction, roller
     : action.input
   const actionId = action.type === 'choose-action' ? action.actionId : identifyAltarAction(input)
   const targetId = action.targetId
-  if (actionId && !isActionTargetAllowed(actionId, targetId)) {
+  if (actionId && !isConfiguredActionAllowed(state, actionId, targetId)) {
     return {
       ...state,
       entries: [...state.entries, createNarrativeEntry('Sistema', 'Debes acercarte al objeto correcto para realizar esa acción.', 'muted')],
@@ -207,9 +209,11 @@ export function restoreGameSnapshot(snapshot: GameSnapshot): GameState {
   return structuredClone(snapshot)
 }
 
-function isActionTargetAllowed(actionId: NarrativeAction['id'], targetId: string | undefined): boolean {
+function isConfiguredActionAllowed(state: GameState, actionId: NarrativeAction['id'], targetId: string | undefined): boolean {
   if (!targetId) return false
-  if (actionId === 'inspect-altar' || actionId === 'retry-altar') return targetId === 'altar'
-  if (actionId === 'inspect-torch' || actionId === 'light-torch') return targetId.startsWith('torch-')
-  return actionId === 'open-exit' && targetId === 'exit-door'
+  const configuredAction = cryptOfLunargenta.actions.find((candidate) => candidate.id === actionId)
+  if (!configuredAction) return false
+  const completedObjectives = new Set(state.objectives.filter((objective) => objective.completed).map((objective) => objective.id))
+  const spatialRequirements = configuredAction.requires.filter((requirement) => 'nearObject' in requirement)
+  return evaluateRequirements(spatialRequirements, { flags: state.flags, completedObjectives, nearbyObjectIds: new Set([targetId, targetId === 'altar' ? 'altar-main' : targetId]) })
 }
