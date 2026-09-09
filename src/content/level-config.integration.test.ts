@@ -35,6 +35,18 @@ describe('bundled level content integration', () => {
     }
   })
 
+  it('keeps every object inside its playable bounds', () => {
+    for (const level of [cryptOfLunargenta, ashenCourtyard]) {
+      const { bounds } = level.scene
+      for (const object of level.objects) {
+        expect(object.position.x, `${level.id}:${object.id} x`).toBeGreaterThanOrEqual(bounds.minX)
+        expect(object.position.x, `${level.id}:${object.id} x`).toBeLessThanOrEqual(bounds.maxX)
+        expect(object.position.z, `${level.id}:${object.id} z`).toBeGreaterThanOrEqual(bounds.minZ)
+        expect(object.position.z, `${level.id}:${object.id} z`).toBeLessThanOrEqual(bounds.maxZ)
+      }
+    }
+  })
+
   it('indexes both bundled zones by their stable zone ID', () => {
     expect(levelsByZoneId['crypt-of-lunargenta']).toBe(cryptOfLunargenta)
     expect(levelsByZoneId['ashen-courtyard']).toBe(ashenCourtyard)

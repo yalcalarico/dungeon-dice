@@ -4,7 +4,7 @@
   "title": "La Cripta de Lunargenta",
   "retryCost": { "type": "hp", "amount": 3 },
   "scene": {
-    "bounds": { "minX": -10.8, "maxX": 10.8, "minZ": -5.8, "maxZ": 6.2 },
+    "bounds": { "minX": -11.2, "maxX": 10.8, "minZ": -6.2, "maxZ": 6.2 },
     "environment": {
       "rain": { "enabled": true, "density": 96, "speed": 4.5 },
       "floor": { "wetness": 0.8, "puddles": true }
@@ -15,7 +15,7 @@
     { "id": "torch-1", "type": "torch", "position": { "x": -7, "y": 0, "z": -6 }, "interaction": { "radius": 2.2, "actions": ["inspect-torch", "light-torch"] } },
     { "id": "torch-2", "type": "torch", "position": { "x": 8, "y": 0, "z": 5 }, "interaction": { "radius": 2.2, "actions": ["inspect-torch", "light-torch"] } },
     { "id": "torch-3", "type": "torch", "position": { "x": -11, "y": 0, "z": 4 }, "interaction": { "radius": 2.2, "actions": ["inspect-torch", "light-torch"] } },
-    { "id": "exit-door", "type": "exit-door", "position": { "x": 0, "y": 0, "z": -7.06 }, "interaction": { "radius": 2.2, "actions": ["open-exit"] } }
+    { "id": "exit-door", "type": "exit-door", "position": { "x": 0, "y": 0, "z": -5.4 }, "interaction": { "radius": 2.2, "actions": ["open-exit"] } }
   ],
   "objectives": [
     { "id": "objective-investigate-altar", "label": "Investigar el altar", "blocking": true, "completion": { "flag": "altarInvestigated" } },
