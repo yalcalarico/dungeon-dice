@@ -6,7 +6,7 @@ import { transitionGameState } from './state/game-state'
 import { createInitialSession, resetSession, transitionSession, type Session } from './state/session'
 import { cryptOfLunargenta } from './content'
 import { archetypes, attributeModifier, createCharacter, pointBuyCost, rollDndAttributes, validateDndPointBuy, type Character, type CharacterAttributes } from './characters/character'
-import { applyMvpAction, createMvpSession, type InventoryItem, type MvpAction, type MvpSession } from './mvp/campaign'
+import { applyMvpAction, createMvpSession, SENTINEL_ATTACK_BONUS, type InventoryItem, type MvpAction, type MvpSession } from './mvp/campaign'
 import { loadCharacters, loadMvpSession, saveCharacter, saveMvpSession } from './mvp/storage'
 import './App.css'
 
@@ -81,7 +81,7 @@ function App() {
     if (action.type === 'resolve-attack') {
       const enemyDamage = Math.max(0, mvp.encounter.enemyHp - next.encounter.enemyHp)
       const playerDamage = Math.max(0, mvp.character.resources.hp - next.character.resources.hp)
-      sceneRef.current?.triggerCombatFeedback('player', action.roll >= 10)
+      sceneRef.current?.triggerCombatFeedback('player', enemyDamage > 0)
       if (enemyDamage > 0) sceneRef.current?.showCombatNotification('enemy', enemyDamage, 'debuff')
       if (next.character.resources.hp < mvp.character.resources.hp) {
         sceneRef.current?.showCombatNotification('player', playerDamage, 'debuff')
@@ -215,7 +215,7 @@ function App() {
     setIsRolling(true)
     rollTimerRef.current = window.setTimeout(() => {
       try {
-        if (resolvingEncounter) { const roll = roller.roll(attributeModifier(character?.attributes.strength ?? 10)); performMvpAction({ type: 'resolve-attack', roll: roll.total, die: roll.value, modifier: roll.modifier }) }
+        if (resolvingEncounter) { const roll = roller.roll(attributeModifier(character?.attributes.strength ?? 10)); const damageRoll = roller.roll(); performMvpAction({ type: 'resolve-attack', roll: roll.total, die: roll.value, modifier: roll.modifier, damageRoll: damageRoll.value }) }
         else setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'roll-dice' }, roller)))
       } catch {
         setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message: 'La tirada no pudo resolverse. La acción sigue disponible para reintentar.', }, roller)))
@@ -291,9 +291,11 @@ function App() {
   useEffect(() => {
     if (!mvp || mvp.encounter.status !== 'active' || mvp.encounter.turn !== 'enemy') return
     turnTimerRef.current = window.setTimeout(() => {
-      const next = applyMvpAction(mvp, { type: 'resolve-enemy-turn' })
-      const damage = Math.max(0, mvp.character.resources.hp - next.character.resources.hp)
-      sceneRef.current?.triggerCombatFeedback('enemy', true)
+       const attackRoll = roller.roll(SENTINEL_ATTACK_BONUS)
+       const damageRoll = roller.roll()
+       const next = applyMvpAction(mvp, { type: 'resolve-enemy-turn', roll: attackRoll.total, die: attackRoll.value, modifier: attackRoll.modifier, damageRoll: damageRoll.value })
+       const damage = Math.max(0, mvp.character.resources.hp - next.character.resources.hp)
+       if (damage > 0) sceneRef.current?.triggerCombatFeedback('player', true)
       if (damage > 0) sceneRef.current?.showCombatNotification('player', damage, 'debuff')
       setMvp(next)
       const died = next.character.resources.hp <= 0
@@ -304,7 +306,7 @@ function App() {
       turnTimerRef.current = null
     }, 850)
     return () => { if (turnTimerRef.current !== null) window.clearTimeout(turnTimerRef.current) }
-  }, [mvp])
+  }, [mvp, roller])
 
   return (
     <main className="app-shell">

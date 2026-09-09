@@ -46,4 +46,38 @@ describe('MVP campaign rules', () => {
 
     expect(traveled.character.resources.hp).toBe(4)
   })
+
+  it('uses strength, armor class and variable damage for player attacks', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'start-encounter' })
+    const resolved = applyMvpAction(session, { type: 'resolve-attack', roll: 15, die: 13, modifier: 2, damageRoll: 1 })
+
+    expect(resolved.encounter.enemyHp).toBe(15)
+    expect(resolved.log.at(-1)).toContain('Causas 3 de daño')
+  })
+
+  it('allows player attacks to miss when the total is below enemy armor class', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'start-encounter' })
+    const resolved = applyMvpAction(session, { type: 'resolve-attack', roll: 11, die: 11, modifier: 0, damageRoll: 8 })
+
+    expect(resolved.encounter.enemyHp).toBe(18)
+    expect(resolved.log.at(-1)).toContain('esquiva')
+  })
+
+  it('allows enemy attacks to miss or deal variable damage against player armor class', () => {
+    const scout = createCharacter('Lía', 'scout', 'wanderer', '00000000-0000-4000-8000-000000000002')
+    let session = applyMvpAction(createMvpSession(scout), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'start-encounter' })
+    session = applyMvpAction(session, { type: 'resolve-attack', roll: 1, die: 1, modifier: 2 })
+    const missed = applyMvpAction(session, { type: 'resolve-enemy-turn', roll: 11, die: 7, modifier: 4, damageRoll: 20 })
+
+    expect(missed.character.resources.hp).toBe(scout.resources.hp)
+    expect(missed.log.at(-1)).toContain('falla')
+
+    const hit = applyMvpAction(missed, { type: 'resolve-attack', roll: 20, die: 20, modifier: 2, damageRoll: 1 })
+    const damaged = applyMvpAction(hit, { type: 'resolve-enemy-turn', roll: 24, die: 20, modifier: 4, damageRoll: 6 })
+    expect(damaged.character.resources.hp).toBe(scout.resources.hp - 7)
+    expect(damaged.log.at(-1)).toContain('causa 7 de daño')
+  })
 })
