@@ -169,10 +169,10 @@ El personaje no debe conocer detalles de la cripta. El nivel tampoco debe mutar 
 - [ ] Extraer HP y MP al modelo de personaje.
 - [ ] Añadir modificadores de atributos a checks.
 - [ ] Generalizar costes de recursos.
-- [ ] Crear eventos de recompensa de experiencia.
-- [ ] Crear milestones configurables por nivel.
+- [x] Crear eventos de recompensa de experiencia.
+- [x] Crear milestones configurables por nivel.
 - [ ] Crear tabla de experiencia y niveles.
-- [ ] Implementar guardado/carga local.
+- [x] Implementar guardado/carga local.
 - [ ] Añadir migraciones de schema.
 - [ ] Añadir tests unitarios e integración por cada sistema.
 
