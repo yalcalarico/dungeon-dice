@@ -149,7 +149,6 @@ Este documento es el checklist operativo para convertir el demo actual en el MVP
 
 Se implementaron los siguientes sub-slices verificables sin declarar completos sus slices de producto:
 
-- [x] **S6:** validar y normalizar sesiones MVP al cargar, migrar campos antiguos del encuentro y conservar el guardado válido si falla una escritura.
 - [x] **S6:** validar y normalizar sesiones MVP al cargar, migrar campos antiguos del encuentro, conservar el guardado válido si falla una escritura y añadir guardado manual.
 - [x] **S7:** evitar que un check resuelto vuelva a aplicar efectos, conservar zonas visitadas y añadir evaluador genérico de requisitos/efectos.
 - [x] **S8:** usar una tabla versionada de XP, hacer idempotentes los milestones y sincronizar nivel/recompensas del personaje.
@@ -158,7 +157,7 @@ Se implementaron los siguientes sub-slices verificables sin declarar completos s
 - [x] **S11:** añadir retirada explícita sin recompensas y una decisión de ruta persistente alrededor de Iria.
 - [x] **S12:** hacer verificables las dos rutas: `relic` conserva la llave de ceniza y `direct` bloquea la reliquia y entrega un sello de brasa tras la victoria.
 
-S6-S10 siguen parciales: faltan guardado manual y checkpoints, runtime declarativo general, tabla de progresión configurable, equipamiento y diálogos definidos desde contenido.
+S6-S12 tienen fundamentos implementados, pero siguen parciales: faltan montaje visual desde JSON, CLI de authoring, migraciones, catálogo declarativo completo y campaña integrada sin reglas hardcoded.
 
 ## Integración visual MVP - estado de esta pasada
 
@@ -172,7 +171,7 @@ S6-S10 siguen parciales: faltan guardado manual y checkpoints, runtime declarati
 - [x] Añadir onboarding, foco visible, feedback de errores y `prefers-reduced-motion`.
 - [x] Completar QA manual de navegador, lifecycle, responsive y estados visuales.
 - [x] Instrumentar FPS, frame time, frames lentos, draw calls, triángulos, geometrías y texturas en desarrollo.
-- [ ] Unificar completamente el personaje con `GameState` y checks d20 del altar.
+- [x] Unificar la fuente de atributos del personaje entre `GameState`, `MvpSession` y checks d20.
 - [ ] Cargar/desmontar `GameScene` desde JSON por zona sin decoración hardcoded.
 - [ ] Implementar guardado manual, autosave por checkpoint y recuperación atómica del estado completo.
 - [ ] Añadir runtime declarativo genérico para NPCs, loot, encuentros y narrativa.

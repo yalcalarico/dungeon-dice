@@ -12,6 +12,7 @@ El proyecto todavía no cumple completamente este objetivo:
 
 - Los IDs y acciones del altar están definidos en `src/narrative/altar.ts`.
 - Las posiciones del altar, antorchas y puerta están definidas en `GameScene.ts`.
+- El Patio de Ceniza, Iria, la reliquia y el Centinela todavía se construyen con posiciones, tipos y reglas hardcoded en `GameScene.ts`, `App.tsx` y `mvp/campaign.ts`; no existe aún un JSON equivalente para esa zona.
 - Las reglas de requisitos y consecuencias están codificadas en condicionales TypeScript.
 - El authoring de campaña ya permite exportar y cargar mapas JSON versionados.
 - Las migraciones entre versiones todavía no están implementadas.
@@ -136,6 +137,10 @@ La futura herramienta debe permitir:
 - [x] Añadir exportación y carga de mapas de campaña.
 - [ ] Añadir migraciones entre versiones.
 - [ ] Crear un segundo nivel usando únicamente JSON.
+
+### Auditoría de parametrización
+
+El estado actual no cumple todavía el criterio de "contenido sin editar TypeScript". El JSON de `crypt-of-lunargenta` parametriza parte de la cripta, pero el runtime conserva reglas específicas para altar, antorchas, puerta, patio, NPC, reliquia, enemigo, combate, recompensas y transiciones. El cierre de S3/S4 requiere migrar también el Patio de Ceniza a configuración y hacer que `GameScene` monte objetos por tipo desde esa configuración.
 
 ## Criterios de aceptación
 
