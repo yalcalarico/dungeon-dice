@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createCharacter } from '../characters/character'
-import { applyMvpAction, createMvpSession } from './campaign'
+import { ashenCourtyard } from '../content'
+import { applyMvpAction, createMvpSession, findEnemy, findReward } from './campaign'
 
 const character = createCharacter('Alda', 'vanguard', 'wanderer', '00000000-0000-4000-8000-000000000001')
 
@@ -15,6 +16,19 @@ describe('MVP campaign rules', () => {
     expect(session.experience).toBe(25)
     expect(session.inventory[0].id).toBe('ash-key')
     expect(session.visitedZoneIds).toContain('ashen-courtyard')
+  })
+
+  it('uses changed declarative Patio labels, rewards and enemy rules without new code', () => {
+    const changedLevel = {
+      ...ashenCourtyard,
+      actions: ashenCourtyard.actions.map((action) => action.id === 'talk-npc' ? { ...action, label: 'Consultar al vigia' } : action),
+      rewards: ashenCourtyard.rewards?.map((reward) => reward.id === 'direct-route-reward' ? { ...reward, experience: 99, item: { ...reward.item!, label: 'Marca del umbral' } } : reward),
+      enemies: ashenCourtyard.enemies?.map((enemy) => ({ ...enemy, name: 'Vigia del umbral', stats: { ...enemy.stats, armorClass: 17, damage: { ...enemy.stats.damage, modifier: 3 } } })),
+    }
+
+    expect(changedLevel.actions.find((action) => action.id === 'talk-npc')?.label).toBe('Consultar al vigia')
+    expect(findReward([changedLevel], 'direct-route-reward')).toMatchObject({ experience: 99, item: { label: 'Marca del umbral' } })
+    expect(findEnemy(changedLevel)).toMatchObject({ name: 'Vigia del umbral', stats: { armorClass: 17, damage: { modifier: 3 } } })
   })
 
   it('makes encounter rewards idempotent and supports defeat recovery', () => {
@@ -48,6 +62,56 @@ describe('MVP campaign rules', () => {
     expect(finished.log.at(-1)).toContain('todo lo que sabe')
   })
 
+  it('persists a route decision and supports retreat without rewards', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'talk-npc' })
+    session = applyMvpAction(session, { type: 'choose-route', route: 'relic' })
+    session = applyMvpAction(session, { type: 'start-encounter' })
+    const retreated = applyMvpAction(session, { type: 'retreat' })
+
+    expect(session.routeChoice).toBe('relic')
+    expect(retreated.encounter.status).toBe('idle')
+    expect(retreated.experience).toBe(0)
+  })
+
+  it('keeps the relic route reward and does not duplicate it after victory', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'talk-npc' })
+    session = applyMvpAction(session, { type: 'choose-route', route: 'relic' })
+    session = applyMvpAction(session, { type: 'inspect-relic' })
+    const inspected = applyMvpAction(session, { type: 'inspect-relic' })
+
+    expect(inspected.routeChoice).toBe('relic')
+    expect(inspected.experience).toBe(25)
+    expect(inspected.inventory.find((item) => item.id === 'ash-key')?.quantity).toBe(1)
+  })
+
+  it('blocks the relic on the direct route and grants its alternative reward on victory', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = applyMvpAction(session, { type: 'talk-npc' })
+    session = applyMvpAction(session, { type: 'choose-route', route: 'direct' })
+    const blocked = applyMvpAction(session, { type: 'inspect-relic' })
+    expect(blocked.experience).toBe(0)
+    expect(blocked.inventory.find((item) => item.id === 'ash-key')).toBeUndefined()
+
+    session = applyMvpAction(blocked, { type: 'start-encounter' })
+    for (let turn = 0; turn < 4; turn++) {
+      session = applyMvpAction(session, { type: 'attack' })
+      session = applyMvpAction(session, { type: 'resolve-attack', roll: 20 })
+      if (session.encounter.turn === 'enemy') session = applyMvpAction(session, { type: 'resolve-enemy-turn' })
+    }
+
+    expect(session.routeChoice).toBe('direct')
+    expect(session.encounter.status).toBe('victory')
+    expect(session.experience).toBe(60)
+    expect(session.inventory.find((item) => item.id === 'ember-seal')?.quantity).toBe(1)
+    expect(session.inventory.find((item) => item.id === 'ash-key')).toBeUndefined()
+
+    const repeated = applyMvpAction(session, { type: 'resolve-attack', roll: 20 })
+    expect(repeated.experience).toBe(60)
+    expect(repeated.inventory.find((item) => item.id === 'ember-seal')?.quantity).toBe(1)
+  })
+
   it('keeps inventory quantities and protects quest items', () => {
     let session = applyMvpAction(createMvpSession(character), { type: 'inspect-relic' })
     const blocked = applyMvpAction(session, { type: 'drop-item', itemId: 'ash-key' })
@@ -74,6 +138,18 @@ describe('MVP campaign rules', () => {
     const traveled = applyMvpAction(damaged, { type: 'travel', zoneId: 'ashen-courtyard' })
 
     expect(traveled.character.resources.hp).toBe(4)
+  })
+
+  it('restores the latest zone checkpoint after defeat', () => {
+    let session = applyMvpAction(createMvpSession(character), { type: 'travel', zoneId: 'ashen-courtyard' })
+    session = { ...session, character: { ...session.character, resources: { ...session.character.resources, hp: 1 } } }
+    session = applyMvpAction(session, { type: 'start-encounter' })
+    session = applyMvpAction(session, { type: 'resolve-attack', roll: 1, die: 1, modifier: 2 })
+    const defeated = applyMvpAction(session, { type: 'resolve-enemy-turn', roll: 20, die: 20, modifier: 4, damageRoll: 6 })
+    const reset = applyMvpAction(defeated, { type: 'reset-encounter' })
+
+    expect(reset.character.resources.hp).toBe(character.resources.hp)
+    expect(reset.zoneId).toBe('ashen-courtyard')
   })
 
   it('uses strength, armor class and variable damage for player attacks', () => {

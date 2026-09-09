@@ -1,5 +1,6 @@
 import { validateCharacter, type Character } from '../characters/character'
-import type { InventoryItem, MvpSession } from './campaign'
+import { INVENTORY_CAPACITY, findInventoryItem, inventoryFromCharacter, synchronizeMvpSession, type InventoryItem, type MvpSession } from './campaign'
+import { getLevelByZoneId } from '../content'
 
 const CHARACTER_KEY = 'dungeon-dice:characters:v1'
 const SESSION_KEY = 'dungeon-dice:mvp-session:v1'
@@ -8,20 +9,20 @@ export function loadCharacters(): Character[] {
   try { const value: unknown = JSON.parse(localStorage.getItem(CHARACTER_KEY) ?? '[]'); return Array.isArray(value) ? value.filter(validateCharacter) : [] } catch { return [] }
 }
 
-export function saveCharacter(character: Character): void {
-  if (!validateCharacter(character)) return
+export function saveCharacter(character: Character): boolean {
+  if (!validateCharacter(character)) return false
   const characters = loadCharacters().filter((candidate) => candidate.id !== character.id)
-  try { localStorage.setItem(CHARACTER_KEY, JSON.stringify([...characters, character])) } catch { /* Storage can be unavailable or full. Keep the previous snapshot. */ }
+  try { localStorage.setItem(CHARACTER_KEY, JSON.stringify([...characters, character])); return true } catch { return false }
 }
 
 export function loadMvpSession(characterId: string): MvpSession | null {
   try { return normalizeMvpSession(JSON.parse(localStorage.getItem(`${SESSION_KEY}:${characterId}`) ?? 'null'), characterId) } catch { return null }
 }
 
-export function saveMvpSession(session: MvpSession): void {
+export function saveMvpSession(session: MvpSession): boolean {
   const normalized = normalizeMvpSession(session, session.character.id)
-  if (!normalized) return
-  try { localStorage.setItem(`${SESSION_KEY}:${session.character.id}`, JSON.stringify(normalized)) } catch { /* Storage can be unavailable or full. Keep the previous snapshot. */ }
+  if (!normalized) return false
+  try { localStorage.setItem(`${SESSION_KEY}:${session.character.id}`, JSON.stringify(normalized)); return true } catch { return false }
 }
 
 export function validateMvpSession(value: unknown, characterId?: string): value is MvpSession {
@@ -30,16 +31,17 @@ export function validateMvpSession(value: unknown, characterId?: string): value 
 
 function normalizeMvpSession(value: unknown, characterId?: string): MvpSession | null {
   if (!isRecord(value) || !validateCharacter(value.character) || (characterId !== undefined && value.character.id !== characterId)) return null
-  const zoneId = value.zoneId === 'ashen-courtyard' || value.zoneId === 'crypt-of-lunargenta' ? value.zoneId : null
-  const inventory = normalizeInventory(value.inventory)
+  const zoneId = isConfiguredZone(value.zoneId) ? value.zoneId : null
+  const storedInventory = normalizeInventory(value.inventory)
   const encounter = isRecord(value.encounter) ? value.encounter : {}
   const npcTrust = finiteNumber(value.npcTrust)
   const experience = finiteNumber(value.experience)
   const level = finiteNumber(value.level)
-  if (!zoneId || !inventory || !Array.isArray(value.visitedZoneIds) || !value.visitedZoneIds.every((id): id is string => typeof id === 'string') || npcTrust === null || experience === null || level === null || !Array.isArray(value.completedMilestones) || !value.completedMilestones.every((id): id is string => typeof id === 'string') || !Array.isArray(value.log) || !value.log.every((entry): entry is string => typeof entry === 'string')) return null
-  const normalizedExperience = Math.max(0, experience)
-  const normalizedLevel = Math.max(1, Math.floor(level))
-  const completedMilestones = [...new Set(value.completedMilestones)]
+  if (!zoneId || !storedInventory || !Array.isArray(value.visitedZoneIds) || !value.visitedZoneIds.every((id): id is string => typeof id === 'string') || npcTrust === null || experience === null || level === null || !Array.isArray(value.completedMilestones) || !value.completedMilestones.every((id): id is string => typeof id === 'string') || !Array.isArray(value.log) || !value.log.every((entry): entry is string => typeof entry === 'string')) return null
+  const normalizedExperience = Math.max(0, value.character.experience)
+  const normalizedLevel = Math.max(1, Math.floor(value.character.level))
+  const completedMilestones = [...new Set(value.character.completedMilestones)]
+  const inventory = inventoryFromCharacter(value.character.inventory)
   const character: Character = {
     ...value.character,
     experience: normalizedExperience,
@@ -52,7 +54,11 @@ function normalizeMvpSession(value: unknown, characterId?: string): MvpSession |
     zoneId,
     visitedZoneIds: [...new Set(value.visitedZoneIds)],
     npcTrust: Math.max(0, Math.min(2, Math.floor(npcTrust))),
+    routeChoice: value.routeChoice === 'relic' || value.routeChoice === 'direct' ? value.routeChoice : null,
+    checkpoint: normalizeCheckpoint(value.checkpoint, zoneId, character.resources.hp),
     inventory,
+    equippedItemId: typeof value.equippedItemId === 'string' && findInventoryItem(value.equippedItemId) ? value.equippedItemId : null,
+    inventoryCapacity: positiveNumber(value.inventoryCapacity, INVENTORY_CAPACITY),
     experience: normalizedExperience,
     lastRoll: finiteOrNull(value.lastRoll),
     lastDie: finiteOrNull(value.lastDie ?? value.lastRoll),
@@ -70,27 +76,37 @@ function normalizeMvpSession(value: unknown, characterId?: string): MvpSession |
     completedMilestones,
     log: value.log.slice(-12),
   }
-  return validateNormalizedSession(normalized) ? normalized : null
+  const synchronized = synchronizeMvpSession(normalized)
+  return validateNormalizedSession(synchronized) ? synchronized : null
 }
 
 function normalizeInventory(value: unknown): InventoryItem[] | null {
   if (!Array.isArray(value)) return null
   const items = new Map<InventoryItem['id'], InventoryItem>()
   for (const candidate of value) {
-    if (!isRecord(candidate) || (candidate.id !== 'moon-potion' && candidate.id !== 'ash-key') || typeof candidate.label !== 'string' || (candidate.kind !== 'consumable' && candidate.kind !== 'quest') || typeof candidate.quantity !== 'number' || !Number.isInteger(candidate.quantity) || candidate.quantity <= 0) return null
+    if (!isRecord(candidate) || typeof candidate.id !== 'string' || !findInventoryItem(candidate.id) || typeof candidate.quantity !== 'number' || !Number.isInteger(candidate.quantity) || candidate.quantity <= 0) return null
     const id = candidate.id
-    const label = candidate.label
+    const configuredItem = findInventoryItem(id)
+    if (!configuredItem) return null
+    const label = configuredItem.label
     const quantity = candidate.quantity
-    const kind = candidate.kind
+    const kind = configuredItem.kind
     const existing = items.get(id)
     if (existing) existing.quantity += quantity
-    else items.set(id, { id, label, quantity, kind })
+    else items.set(id, { id, label, quantity, kind, equippable: configuredItem.equippable })
   }
   return [...items.values()]
 }
 
 function validateNormalizedSession(session: MvpSession): boolean {
   return validateCharacter(session.character) && session.inventory.every((item) => item.quantity > 0) && session.encounter.enemyMaxHp > 0
+}
+
+function normalizeCheckpoint(value: unknown, fallbackZoneId: MvpSession['zoneId'], fallbackHp: number): MvpSession['checkpoint'] {
+  if (!isRecord(value)) return { zoneId: fallbackZoneId, hp: fallbackHp }
+  const zoneId = isConfiguredZone(value.zoneId) ? value.zoneId : fallbackZoneId
+  const hp = typeof value.hp === 'number' && Number.isFinite(value.hp) ? Math.max(1, Math.min(fallbackHp, value.hp)) : fallbackHp
+  return { zoneId, hp }
 }
 
 function valueOfEncounterStatus(value: unknown): MvpSession['encounter']['status'] { return value === 'active' || value === 'victory' || value === 'defeat' ? value : 'idle' }
@@ -100,3 +116,4 @@ function finiteOrZero(value: unknown): number { return typeof value === 'number'
 function nonNegativeNumber(value: unknown, fallback: number): number { return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : fallback }
 function positiveNumber(value: unknown, fallback: number): number { return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null && !Array.isArray(value) }
+function isConfiguredZone(value: unknown): value is MvpSession['zoneId'] { return typeof value === 'string' && getLevelByZoneId(value) !== undefined }

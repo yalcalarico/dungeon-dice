@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "ashen-courtyard",
+  "title": "El Patio de Ceniza",
+  "retryCost": { "type": "hp", "amount": 3 },
+  "scene": {
+    "bounds": { "minX": -10, "maxX": 10, "minZ": -6, "maxZ": 6 },
+    "environment": {
+      "rain": { "enabled": false, "density": 0, "speed": 0 },
+      "floor": { "wetness": 0.25, "puddles": false }
+    }
+  },
+  "objects": [
+    { "id": "iria-object", "type": "npc", "position": { "x": -4, "y": 0, "z": 1 }, "interaction": { "radius": 1.8, "actions": ["talk-npc"] } },
+    { "id": "courtyard-relic-object", "type": "relic", "position": { "x": 6, "y": 0, "z": -1 }, "interaction": { "radius": 1.8, "actions": ["inspect-relic"] } },
+    { "id": "ash-sentinel-object", "type": "enemy", "position": { "x": 2, "y": 0, "z": -1 }, "interaction": { "radius": 2.4, "actions": ["start-encounter", "attack"] } }
+  ],
+  "objectives": [
+    { "id": "objective-meet-iria", "label": "Hablar con Iria", "blocking": true, "completion": { "flag": "iriaMet" } },
+    { "id": "objective-defeat-sentinel", "label": "Derrotar al Centinela", "blocking": true, "completion": { "flag": "sentinelDefeated" } }
+  ],
+  "checks": [],
+  "actions": [
+    { "id": "talk-npc", "label": "Hablar con Iria", "keywords": ["hablar con iria", "hablar iria", "buscar a iria"], "requires": [{ "nearObject": "iria-object" }], "effects": [{ "setFlag": "iriaMet" }], "movement": { "during": "allowed", "after": "allowed" } },
+    { "id": "inspect-relic", "label": "Inspeccionar la reliquia", "keywords": ["inspeccionar reliquia", "examinar reliquia", "mirar reliquia"], "requires": [{ "nearObject": "courtyard-relic-object" }], "effects": [{ "setFlag": "relicDiscovered" }], "movement": { "during": "allowed", "after": "allowed" } },
+    { "id": "start-encounter", "label": "Desafiar al Centinela", "keywords": ["desafiar centinela", "luchar contra centinela", "atacar centinela"], "requires": [{ "nearObject": "ash-sentinel-object" }], "effects": [], "movement": { "during": "locked", "after": "allowed" } },
+    { "id": "attack", "label": "Atacar", "keywords": ["atacar", "golpear"], "requires": [{ "nearObject": "ash-sentinel-object" }], "effects": [], "movement": { "during": "locked", "after": "locked" } }
+  ],
+  "victory": { "requires": [{ "objectiveCompleted": "objective-defeat-sentinel" }] },
+  "npcs": [
+    { "id": "iria", "objectId": "iria-object", "name": "Iria", "dialogueIds": ["iria-route", "iria-relic", "iria-farewell"] }
+  ],
+  "dialogues": [
+    { "id": "iria-route", "npcId": "iria", "minTrust": 0, "text": "La guardiana te ofrece una ruta segura hacia el patio.", "nextTrust": 1 },
+    { "id": "iria-relic", "npcId": "iria", "minTrust": 1, "text": "Iria confía en ti y te entrega una pista sobre la reliquia.", "nextTrust": 2 },
+    { "id": "iria-farewell", "npcId": "iria", "minTrust": 2, "text": "Iria asiente. Ya te ha contado todo lo que sabe." }
+  ],
+  "rewards": [
+    { "id": "relic-discovered", "experience": 25, "item": { "id": "ash-key", "label": "Llave de ceniza", "quantity": 1, "kind": "quest", "equippable": true } },
+    { "id": "sentinel-defeated", "experience": 40, "item": { "id": "moon-potion", "label": "Poción lunar", "quantity": 2, "kind": "consumable" } },
+    { "id": "direct-route-reward", "experience": 20, "item": { "id": "ember-seal", "label": "Sello de brasa", "quantity": 1, "kind": "quest" } }
+  ],
+  "relics": [
+    { "id": "ash-relic", "objectId": "courtyard-relic-object", "name": "Reliquia de ceniza", "rewardIds": ["relic-discovered"] }
+  ],
+  "enemies": [
+    { "id": "ash-sentinel", "objectId": "ash-sentinel-object", "name": "Centinela de ceniza", "stats": { "maxHp": 18, "armorClass": 14, "attackBonus": 4, "damage": { "die": "d6", "modifier": 1 } }, "rewardIds": ["sentinel-defeated"] }
+  ],
+  "routeChoices": [
+    { "id": "relic", "label": "Seguir la pista hacia la reliquia", "minTrust": 1, "requires": [{ "flag": "iriaMet" }], "effects": [{ "setFlag": "relicRouteChosen" }], "rewardIds": ["relic-discovered"] },
+    { "id": "direct", "label": "Avanzar directamente hacia el Centinela", "minTrust": 1, "requires": [{ "flag": "iriaMet" }], "effects": [{ "setFlag": "directRouteChosen" }], "rewardIds": ["direct-route-reward"] }
+  ]
+}

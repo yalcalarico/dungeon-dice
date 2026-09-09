@@ -35,6 +35,16 @@ Evitar regresiones en la lógica jugable, el ciclo de vida de Three.js y la expe
 
 **Evidencia:** QA manual confirmado por el propietario el 2026-09-08. La validación cubrió la ruta jugable, controles, responsive, lifecycle y estados visuales. Las métricas de rendimiento reproducibles se mantienen como trabajo técnico separado.
 
+## Checklist de entrega reproducible
+
+- [ ] Ejecutar `npm ci` con la versión de Node declarada por el entorno de entrega.
+- [ ] Ejecutar `npm test` y conservar la salida junto con la fecha, navegador y commit revisado.
+- [ ] Ejecutar `npm run lint` y `npm run build` desde la raíz del repositorio.
+- [ ] Abrir la build con `npm run preview` y comprobar la ruta altar -> antorcha -> puerta -> Patio de Ceniza.
+- [ ] Repetir el smoke test en Safari y Chromium, en escritorio y pantalla pequeña.
+- [ ] Simular WebGL no disponible y verificar el mensaje visible `Escena 3D no disponible`.
+- [ ] Registrar cualquier fallo manual con navegador, sistema operativo, GPU, viewport y pasos de reproducción.
+
 ## Tareas
 
 - [x] Añadir framework de tests cuando exista lógica aislada.
@@ -69,3 +79,4 @@ Evitar regresiones en la lógica jugable, el ciclo de vida de Three.js y la expe
 - La build y el lint se ejecutan en el flujo de verificación.
 - Se ha comprobado el cleanup de la escena y los listeners.
 - Se documentan los riesgos que no puedan automatizarse.
+- La entrega incluye comandos, evidencia y entorno suficientes para repetir la validación.

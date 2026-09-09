@@ -1,6 +1,6 @@
 import { validateContent, type ContentDiagnostic } from './content-validator'
 import type { LevelConfig } from './level-config'
-import type { CampaignMap } from '../world/zones'
+import { loadCampaignMap as validateCampaignMap, type CampaignMap } from '../world/zones'
 
 export class AuthoringValidationError extends Error {
   readonly diagnostics: readonly ContentDiagnostic[]
@@ -19,7 +19,12 @@ export function exportLevelJson(input: unknown, file = '<content>'): string {
 }
 
 export function exportCampaignJson(campaign: CampaignMap): string {
-  return stableJson({ schemaVersion: 1, ...campaign })
+  const validated = validateCampaignMap(campaign)
+  return stableJson(validated)
+}
+
+export function loadCampaignMap(json: string): CampaignMap {
+  return validateCampaignMap(json)
 }
 
 export function createLevelTemplate(base: LevelConfig): LevelConfig {

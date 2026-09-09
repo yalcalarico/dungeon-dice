@@ -16,6 +16,10 @@ import {
   type NarrativeEntry,
   type Objective,
 } from '../narrative/altar'
+import { cryptOfLunargenta, getLevelByZoneId } from '../content'
+import { evaluateRequirements } from '../content/runtime'
+import { isBoundedCommand } from '../security/input-limits'
+import { starterCampaignMap } from '../world/zones'
 
 export type GamePhase = 'exploration' | 'resolving' | 'paused' | 'victory' | 'failure'
 
@@ -34,7 +38,16 @@ export type GameState = {
   lastRollOutcome: 'success' | 'failure' | null
   pendingCheck: { actionId: NarrativeAction['id']; input: string } | null
   movementLocked: boolean
-  player: { hp: number; maxHp: number; mp: number; maxMp: number; attributes: { strength: number; dexterity: number; constitution: number; intelligence: number; wisdom: number; charisma: number } }
+  player: {
+    hp: number
+    maxHp: number
+    mp: number
+    maxMp: number
+    level?: number
+    experience?: number
+    inventory?: string[]
+    attributes: { strength: number; dexterity: number; constitution: number; intelligence: number; wisdom: number; charisma: number }
+  }
 }
 
 export type GameAction =
@@ -49,16 +62,17 @@ export type GameAction =
 
 export function createInitialGameState(): GameState {
   const flags = initialAltarFlags()
+  const initialLevel = cryptOfLunargenta
 
   return {
     phase: 'exploration',
-    zoneId: 'crypt-of-lunargenta',
-    entryPointId: 'start',
-    visitedZoneIds: ['crypt-of-lunargenta'],
+    zoneId: initialLevel.id,
+    entryPointId: starterCampaignMap.zones.find((zone) => zone.id === initialLevel.id)?.entryPointId ?? '',
+    visitedZoneIds: [initialLevel.id],
     pausedPhase: undefined,
     flags,
     entries: [
-      createNarrativeEntry('Narrador', 'La lluvia golpea las bóvedas. Un altar cubierto de ceniza espera en la cripta.'),
+      createNarrativeEntry('Narrador', `La lluvia golpea las bóvedas. Un altar cubierto de ceniza espera en ${initialLevel.title.toLocaleLowerCase()}.`),
       createNarrativeEntry('Sistema', 'Acércate al altar para investigar las runas y comenzar la aventura.', 'muted'),
     ],
     availableActions: availableAltarActions(flags),
@@ -68,11 +82,12 @@ export function createInitialGameState(): GameState {
     lastRollOutcome: null,
     pendingCheck: null,
     movementLocked: false,
-    player: { hp: 18, maxHp: 18, mp: 7, maxMp: 7, attributes: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 } },
+    player: { hp: 18, maxHp: 18, mp: 7, maxMp: 7, level: 1, experience: 0, inventory: [], attributes: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 } },
   }
 }
 
 export function transitionGameState(state: GameState, action: GameAction, roller: D20Roller): GameState {
+  if (!isBoundedCommand(action)) return state
   if (action.type === 'reset') return createInitialGameState()
   if (action.type === 'pause') {
     if (state.phase !== 'exploration' && state.phase !== 'resolving') return state
@@ -84,15 +99,18 @@ export function transitionGameState(state: GameState, action: GameAction, roller
   }
   if (action.type === 'change-zone') {
     if (!action.zoneId || action.zoneId === state.zoneId) return state
+    const level = getLevelByZoneId(action.zoneId)
+    const zone = starterCampaignMap.zones.find((candidate) => candidate.id === action.zoneId)
+    if (!level || !zone) return state
     return {
       ...state,
       phase: 'exploration',
       zoneId: action.zoneId,
-      entryPointId: action.zoneId === 'ashen-courtyard' ? 'crypt-gate' : 'start',
+      entryPointId: zone.entryPointId,
       pendingCheck: null,
-      availableActions: action.zoneId === 'crypt-of-lunargenta' ? availableAltarActions(state.flags) : [],
+      availableActions: action.zoneId === cryptOfLunargenta.id ? availableAltarActions(state.flags) : [],
       movementLocked: false,
-      entries: [...state.entries, createNarrativeEntry('Sistema', `Has entrado en ${action.zoneId === 'ashen-courtyard' ? 'el Patio de Ceniza' : 'la Cripta de Lunargenta'}.`, 'gold')],
+      entries: [...state.entries, createNarrativeEntry('Sistema', `Has entrado en ${level.title}.`, 'gold')],
     }
   }
   if (state.phase === 'paused' || state.phase === 'victory') return state
@@ -129,7 +147,7 @@ export function transitionGameState(state: GameState, action: GameAction, roller
     : action.input
   const actionId = action.type === 'choose-action' ? action.actionId : identifyAltarAction(input)
   const targetId = action.targetId
-  if (actionId && !isActionTargetAllowed(actionId, targetId)) {
+  if (actionId && !isConfiguredActionAllowed(state, actionId, targetId)) {
     return {
       ...state,
       entries: [...state.entries, createNarrativeEntry('Sistema', 'Debes acercarte al objeto correcto para realizar esa acción.', 'muted')],
@@ -161,7 +179,9 @@ export function transitionGameState(state: GameState, action: GameAction, roller
     }
   }
 
-  const requiresRoll = actionId === 'inspect-altar' && !state.flags.altarInvestigated
+  const configuredAction = getLevelByZoneId(state.zoneId)?.actions.find((candidate) => candidate.id === actionId)
+  const configuredCheck = configuredAction?.check ? state.checks.find((check) => check.id === configuredAction.check) : undefined
+  const requiresRoll = configuredCheck !== undefined && !configuredCheck.completed
   if (requiresRoll) {
     return {
       ...state,
@@ -207,9 +227,11 @@ export function restoreGameSnapshot(snapshot: GameSnapshot): GameState {
   return structuredClone(snapshot)
 }
 
-function isActionTargetAllowed(actionId: NarrativeAction['id'], targetId: string | undefined): boolean {
+function isConfiguredActionAllowed(state: GameState, actionId: NarrativeAction['id'], targetId: string | undefined): boolean {
   if (!targetId) return false
-  if (actionId === 'inspect-altar' || actionId === 'retry-altar') return targetId === 'altar'
-  if (actionId === 'inspect-torch' || actionId === 'light-torch') return targetId.startsWith('torch-')
-  return actionId === 'open-exit' && targetId === 'exit-door'
+  const configuredAction = getLevelByZoneId(state.zoneId)?.actions.find((candidate) => candidate.id === actionId)
+  if (!configuredAction) return false
+  const completedObjectives = new Set(state.objectives.filter((objective) => objective.completed).map((objective) => objective.id))
+  const spatialRequirements = configuredAction.requires.filter((requirement) => 'nearObject' in requirement)
+  return evaluateRequirements(spatialRequirements, { flags: state.flags, completedObjectives, nearbyObjectIds: new Set([targetId, targetId === 'altar' ? 'altar-main' : targetId]) })
 }

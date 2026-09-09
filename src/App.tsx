@@ -1,19 +1,19 @@
-import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react'
+import { startTransition, useEffect, useEffectEvent, useRef, useState, type CSSProperties } from 'react'
 import { GameScene, type ScenePerformanceSnapshot } from './game/GameScene'
+import { INPUT_LIMITS } from './security/input-limits'
 import { createRandomD20 } from './dice/d20'
 import { createRandomD6 } from './dice/d6'
 import { createNarrativeEntry, type AltarActionId } from './narrative/altar'
 import { transitionGameState } from './state/game-state'
 import { createInitialSession, resetSession, transitionSession, type Session } from './state/session'
-import { cryptOfLunargenta } from './content'
+import { campaignLevels, getLevelByZoneId } from './content'
 import { archetypes, attributeModifier, createCharacter, pointBuyCost, rollDndAttributes, validateDndPointBuy, type Character, type CharacterAttributes } from './characters/character'
-import { applyMvpAction, createMvpSession, doesAttackHit, SENTINEL_ATTACK_BONUS, SENTINEL_ARMOR_CLASS, type InventoryItem, type MvpAction, type MvpSession } from './mvp/campaign'
+import { applyMvpAction, createMvpSession, doesAttackHit, type InventoryItem, type MvpAction, type MvpSession } from './mvp/campaign'
 import { loadCharacters, loadMvpSession, saveCharacter, saveMvpSession } from './mvp/storage'
 import './App.css'
 
 type LogEntry = { speaker: string; text: string; tone?: 'gold' | 'muted' | 'danger'; timestamp: number }
 const attributeLabels: Array<[keyof CharacterAttributes, string]> = [['strength', 'FUE'], ['dexterity', 'DES'], ['constitution', 'CON'], ['intelligence', 'INT'], ['wisdom', 'SAB'], ['charisma', 'CAR']]
-const sentinelStats = { name: 'Centinela de ceniza', armorClass: 14, strength: 14, dexterity: 12, constitution: 16, intelligence: 7, wisdom: 11, charisma: 5 }
 
 function App() {
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -38,18 +38,24 @@ function App() {
   const [creationMode, setCreationMode] = useState<'archetype' | 'manual' | 'random'>('archetype')
   const [creationStats, setCreationStats] = useState<CharacterAttributes>(() => ({ ...archetypes[0].attributes }))
   const [characterStatsOpen, setCharacterStatsOpen] = useState(false)
-  const [selectedEntity, setSelectedEntity] = useState<'ash-sentinel' | null>(null)
+  const [selectedEntity, setSelectedEntity] = useState<string | null>(null)
   const [pendingAttackRoll, setPendingAttackRoll] = useState<{ roll: number; die: number; modifier: number } | null>(null)
   const [lastDamageRoll, setLastDamageRoll] = useState<number | null>(null)
   const [autoD20, setAutoD20] = useState(false)
   const [autoD6, setAutoD6] = useState(false)
   const [performanceSnapshot, setPerformanceSnapshot] = useState<ScenePerformanceSnapshot | null>(null)
+  const [sceneError, setSceneError] = useState<string | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'error' | 'idle'>('idle')
   const rollTimerRef = useRef<number | null>(null)
   const combatTimerRef = useRef<number | null>(null)
   const turnTimerRef = useRef<number | null>(null)
   const gameState = session.gameState
-  const activeZoneId = mvp?.zoneId
-  const visibleSelectedEntity = selectedEntity && mvp?.zoneId === 'ashen-courtyard' && mvp.encounter.status !== 'victory' && mvp.encounter.status !== 'defeat' ? selectedEntity : null
+  const activeZoneId = mvp?.zoneId ?? gameState.zoneId
+  const activeLevel = getLevelByZoneId(activeZoneId) ?? campaignLevels[0]
+  const activeEnemy = activeLevel.enemies?.[0]
+  const activeNpc = activeLevel.npcs?.[0]
+  const activeRelic = activeLevel.relics?.[0]
+  const visibleSelectedEntity = selectedEntity === activeEnemy?.id && mvp?.encounter.status !== 'victory' && mvp?.encounter.status !== 'defeat' ? selectedEntity : null
   const encounterStatus = mvp?.encounter.status
   const encounterEnemyHp = mvp?.encounter.enemyHp
   const encounterEnemyMaxHp = mvp?.encounter.enemyMaxHp
@@ -84,6 +90,12 @@ function App() {
 
   const startNewCharacter = () => { setCreationOpen(true); setMenuOpen(false); setCreationError('') }
 
+  const saveGame = () => {
+    if (!mvp || !character) return
+    const saved = saveMvpSession(mvp) && saveCharacter(mvp.character)
+    setSaveStatus(saved ? 'saved' : 'error')
+  }
+
   const performMvpAction = (action: MvpAction) => {
     if (!mvp) return
     const next = applyMvpAction(mvp, action)
@@ -113,16 +125,16 @@ function App() {
       const nextGameState = changedZone
         ? transitionGameState(current.gameState, { type: 'change-zone', zoneId: next.zoneId }, roller)
         : current.gameState
-      const completedCampaign = next.zoneId === 'ashen-courtyard' && next.encounter.status === 'victory'
+      const completedCampaign = (getLevelByZoneId(next.zoneId)?.enemies?.length ?? 0) > 0 && next.encounter.status === 'victory'
       const died = next.character.resources.hp <= 0
       const recoveredFromDeath = action.type === 'reset-encounter' && current.gameState.phase === 'failure'
       const campaignMessages = action.type === 'travel' ? [] : next.log.slice(mvp.log.length)
-      const playerResources = changedZone ? current.gameState.player : { ...next.character.resources, attributes: current.gameState.player.attributes }
+       const playerResources = changedZone ? { ...current.gameState.player, attributes: next.character.attributes } : { ...next.character.resources, attributes: next.character.attributes }
       const entries = [...nextGameState.entries, ...campaignMessages.map((message) => createNarrativeEntry('Sistema', message, action.type === 'resolve-attack' || action.type === 'resolve-enemy-turn' ? 'gold' : undefined))]
       const finalGameState = died
         ? { ...nextGameState, phase: 'failure' as const, movementLocked: true, player: playerResources, entries: [...entries, createNarrativeEntry('Narrador', 'Tu vida llega a cero. Has muerto, pero puedes reintentar el encuentro desde el último punto seguro.', 'danger')] }
         : completedCampaign
-          ? { ...nextGameState, phase: 'victory' as const, movementLocked: false, player: playerResources, entries: [...entries, createNarrativeEntry('Narrador', 'El Patio de Ceniza queda en silencio. Has completado la campaña.', 'gold')] }
+          ? { ...nextGameState, phase: 'victory' as const, movementLocked: false, player: playerResources, entries: [...entries, createNarrativeEntry('Narrador', `${getLevelByZoneId(next.zoneId)?.title ?? next.zoneId} queda en silencio. Has completado la campaña.`, 'gold')] }
           : { ...nextGameState, phase: recoveredFromDeath ? 'exploration' as const : nextGameState.phase, movementLocked: recoveredFromDeath ? false : nextGameState.movementLocked, player: playerResources, entries }
       return transitionSession(current, finalGameState)
     })
@@ -130,9 +142,15 @@ function App() {
 
   useEffect(() => {
     if (!viewportRef.current) return
-    const scene = new GameScene(viewportRef.current, (message) => {
-      setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message }, roller)))
-    }, (target) => setInteractionTarget(target?.id ?? null), (entityId) => setSelectedEntity(entityId === 'ash-sentinel' ? entityId : null))
+    let scene: GameScene
+    try {
+      scene = new GameScene(viewportRef.current, (message) => {
+        setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message }, roller)))
+      }, (target) => setInteractionTarget(target?.id ?? null), setSelectedEntity)
+    } catch (error) {
+      startTransition(() => setSceneError(error instanceof Error ? error.message : 'No se pudo iniciar la escena 3D.'))
+      return
+    }
     sceneRef.current = scene
     scene.start()
     const performanceTimer = window.setInterval(() => setPerformanceSnapshot(scene.getPerformanceSnapshot()), 500)
@@ -176,15 +194,20 @@ function App() {
   const submitAction = (value: string) => {
     const clean = value.trim()
     if (!clean) return
+    if (clean.length > INPUT_LIMITS.maxCommandTextLength) {
+      setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'environment-message', message: `La acción es demasiado larga. Usa ${INPUT_LIMITS.maxCommandTextLength} caracteres o menos.`, }, roller)))
+      return
+    }
     setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'submit-input', input: clean, targetId: interactionTarget ?? undefined }, roller)))
     setAction('')
   }
 
   const chooseAction = (actionId: AltarActionId) => {
-    if (actionId === 'open-exit') setMvp((current) => current ? applyMvpAction(current, { type: 'travel', zoneId: 'ashen-courtyard' }) : current)
+    const destination = actionId === 'open-exit' ? campaignLevels.find((level) => level.id !== activeLevel.id) : undefined
+      if (destination) setMvp((current) => current ? applyMvpAction(current, { type: 'travel', zoneId: destination.id }) : current)
     setSession((current) => {
       const resolved = transitionGameState(current.gameState, { type: 'choose-action', actionId, targetId: interactionTarget ?? undefined }, roller)
-      const nextState = actionId === 'open-exit' && resolved.flags.exitOpened ? transitionGameState(resolved, { type: 'change-zone', zoneId: 'ashen-courtyard' }, roller) : resolved
+      const nextState = destination && resolved.flags.exitOpened ? transitionGameState(resolved, { type: 'change-zone', zoneId: destination.id }, roller) : resolved
       return transitionSession(current, nextState)
     })
   }
@@ -194,21 +217,22 @@ function App() {
   const lastRoll = gameState.lastRoll
   const displayedRoll = pendingAttackRoll?.roll ?? lastRoll?.total ?? mvp?.lastRoll ?? null
   const pendingCheck = gameState.pendingCheck !== null || mvp?.encounter.awaitingRoll === true
-  const inCrypt = mvp?.zoneId === 'crypt-of-lunargenta'
-  const nearAltar = inCrypt && interactionTarget === 'altar'
-  const nearTorch = inCrypt && (interactionTarget?.startsWith('torch-') ?? false)
-  const nearExit = inCrypt && interactionTarget === 'exit-door'
-  const nearIria = !inCrypt && interactionTarget === 'iria'
-  const nearRelic = !inCrypt && interactionTarget === 'courtyard-relic'
-  const nearEnemy = !inCrypt && interactionTarget === 'ash-sentinel'
-  const interactionLabel = nearTorch ? 'ANTORCHA' : nearExit ? 'PUERTA DE SALIDA' : nearAltar ? 'ALTAR' : nearIria ? 'IRIA' : nearRelic ? 'RELIQUIA' : nearEnemy ? 'CENTINELA' : null
+  const objectByType = (type: string) => activeLevel.objects.find((object) => object.type === type)
+  const nearObject = (type: string) => interactionTarget === objectByType(type)?.id
+  const nearAltar = nearObject('altar')
+  const nearTorch = activeLevel.objects.some((object) => object.type === 'torch' && object.id === interactionTarget)
+  const nearExit = nearObject('exit-door')
+  const nearNpc = interactionTarget === activeNpc?.objectId
+  const nearRelic = interactionTarget === activeRelic?.objectId
+  const nearEnemy = interactionTarget === activeEnemy?.objectId
+  const interactionLabel = nearNpc ? activeNpc?.name.toUpperCase() : nearRelic ? activeRelic?.name.toUpperCase() : nearEnemy ? activeEnemy?.name.toUpperCase() : nearTorch ? 'ANTORCHA' : nearExit ? 'PUERTA DE SALIDA' : nearAltar ? 'ALTAR' : null
   const contextualActions = gameState.availableActions.filter((item) => {
     if (nearAltar) return item.id === 'inspect-altar' || item.id === 'retry-altar'
     if (nearTorch) return item.id === 'inspect-torch' || item.id === 'light-torch'
     if (nearExit) return item.id === 'open-exit'
     return false
   })
-  const interactionMessage = nearIria ? 'Una guardiana espera junto al muro.' : nearRelic ? 'Una reliquia pulsa sobre el pedestal.' : nearEnemy ? 'El centinela vigila el paso.' : contextualActions.length > 0
+  const interactionMessage = nearNpc ? `${activeNpc?.name} espera junto al muro.` : nearRelic ? `${activeRelic?.name} pulsa sobre el pedestal.` : nearEnemy ? `${activeEnemy?.name} vigila el paso.` : contextualActions.length > 0
     ? nearAltar && contextualActions.some((item) => item.id === 'inspect-altar') ? 'Puedes investigar este lugar.' : nearAltar && contextualActions.some((item) => item.id === 'retry-altar') ? 'Puedes volver a intentar la prueba a cambio de vida.' : nearAltar ? 'Ya has investigado este altar.' : nearExit ? 'La salida espera una última decisión.' : 'Hay acciones disponibles para esta antorcha.'
     : nearExit ? 'La salida está bloqueada. Revisa los objetivos pendientes.' : 'Todavía no puedes interactuar con este objeto.'
   const outcomeKey = gameState.phase === 'victory'
@@ -229,8 +253,8 @@ function App() {
     rollTimerRef.current = window.setTimeout(() => {
       try {
         if (resolvingEncounter) {
-          const roll = roller.roll(attributeModifier(character?.attributes.strength ?? 10))
-          if (doesAttackHit(roll.value, roll.total, SENTINEL_ARMOR_CLASS)) { setLastDamageRoll(null); setPendingAttackRoll({ roll: roll.total, die: roll.value, modifier: roll.modifier }) }
+          const roll = roller.roll(attributeModifier(mvp?.character.attributes.strength ?? 10))
+          if (doesAttackHit(roll.value, roll.total, activeEnemy?.stats.armorClass ?? 10)) { setLastDamageRoll(null); setPendingAttackRoll({ roll: roll.total, die: roll.value, modifier: roll.modifier }) }
           else { setLastDamageRoll(null); performMvpAction({ type: 'resolve-attack', roll: roll.total, die: roll.value, modifier: roll.modifier }) }
         }
         else setSession((current) => transitionSession(current, transitionGameState(current.gameState, { type: 'roll-dice' }, roller)))
@@ -342,7 +366,7 @@ function App() {
   useEffect(() => {
     if (!mvp || mvp.encounter.status !== 'active' || mvp.encounter.turn !== 'enemy') return
     turnTimerRef.current = window.setTimeout(() => {
-       const attackRoll = roller.roll(SENTINEL_ATTACK_BONUS)
+        const attackRoll = roller.roll(activeEnemy?.stats.attackBonus ?? 0)
        const damageRoll = damageRoller.roll().value
        const next = applyMvpAction(mvp, { type: 'resolve-enemy-turn', roll: attackRoll.total, die: attackRoll.value, modifier: attackRoll.modifier, damageRoll })
        const damage = Math.max(0, mvp.character.resources.hp - next.character.resources.hp)
@@ -357,11 +381,12 @@ function App() {
       turnTimerRef.current = null
     }, 850)
     return () => { if (turnTimerRef.current !== null) window.clearTimeout(turnTimerRef.current) }
-  }, [damageRoller, mvp, roller])
+  }, [activeEnemy, damageRoller, mvp, roller])
 
   return (
     <main className="app-shell">
-      <div ref={viewportRef} className="game-viewport" role="img" aria-label="Escena 3D de la cripta" />
+      <div ref={viewportRef} className="game-viewport" role="img" aria-label={`Escena 3D de ${activeLevel.title}`} />
+      {sceneError && <aside className="scene-error" role="alert"><strong>Escena 3D no disponible</strong><p>{sceneError}</p><small>La interfaz y el registro siguen disponibles, pero esta sesión requiere WebGL para explorar.</small></aside>}
       <div className="vignette" />
       {import.meta.env.DEV && performanceSnapshot && <aside className="performance-panel" aria-label="Diagnóstico de rendimiento">
         <b>{performanceSnapshot.averageFps.toFixed(0)} FPS</b>
@@ -389,22 +414,22 @@ function App() {
 
       <header className="topbar" aria-label="Cabecera de la sesión">
         <div className="brand"><span className="brand-mark">✦</span><span>VEIL / <b>FALL</b></span></div>
-        <div className="session"><span className="live-dot" /> SESIÓN 01 <span className="divider" /> LA CRIPTA DE LUNARGENTA</div>
+        <div className="session"><span className="live-dot" /> SESIÓN 01 <span className="divider" /> {activeLevel.title.toUpperCase()}</div>
         <button ref={menuButtonRef} className="menu-button" type="button" aria-label="Abrir menú de controles" aria-expanded={menuOpen} aria-controls="controls-menu" onClick={() => setMenuOpen(true)}>☰</button>
       </header>
 
-      <aside className="objectives-panel" aria-label="Objetivos y pruebas de la cripta">
-        <div className="objectives-heading">OBJETIVOS DE LA CRIPTA</div>
+      <aside className="objectives-panel" aria-label={`Objetivos y pruebas de ${activeLevel.title}`}>
+        <div className="objectives-heading">OBJETIVOS DEL NIVEL</div>
         <ul>{gameState.objectives.map((objective) => <li key={objective.id} className={`${objective.completed ? 'completed' : ''}${objective.blocked ? ' blocked' : ''}`}><b>{objective.completed ? '✓' : objective.blocked ? '·' : '○'}</b><span>{objective.label}</span></li>)}</ul>
         <div className="checks-heading">PRUEBAS</div>
         <ul className="checks-list">{gameState.checks.map((check) => <li key={check.id} className={`${check.completed ? 'completed' : ''}${check.blocked ? ' blocked' : ''}`}><b>{check.completed ? '✓' : check.blocked ? '·' : 'D20'}</b><span>{check.label}<small>DD {check.difficulty}</small></span></li>)}</ul>
       </aside>
 
-      {visibleSelectedEntity === 'ash-sentinel' && mvp && <aside className="target-stats-panel" aria-label="Estadísticas del Centinela de ceniza">
+      {visibleSelectedEntity && activeEnemy && mvp && <aside className="target-stats-panel" aria-label={`Estadísticas de ${activeEnemy.name}`}>
         <div className="target-stats-header"><span>ENEMIGO</span><button type="button" aria-label="Cerrar estadísticas del enemigo" onClick={() => setSelectedEntity(null)}>×</button></div>
-        <h2>{sentinelStats.name}</h2><p>HP {mvp.encounter.enemyHp}/{mvp.encounter.enemyMaxHp} · CA {sentinelStats.armorClass}</p>
-         <div className="attribute-list">{attributeLabels.map(([key, label]) => { const modifier = attributeModifier(sentinelStats[key]); return <span key={key}><b>{label}</b><strong>{sentinelStats[key]}</strong><small>{modifier >= 0 ? '+' : ''}{modifier}</small></span> })}</div>
-      </aside>}
+        <h2>{activeEnemy.name}</h2><p>HP {mvp.encounter.enemyHp}/{activeEnemy.stats.maxHp} · CA {activeEnemy.stats.armorClass}</p>
+         <div className="attribute-list"><span><b>CA</b><strong>{activeEnemy.stats.armorClass}</strong><small>DEF</small></span><span><b>ATQ</b><strong>{activeEnemy.stats.attackBonus}</strong><small>D20</small></span><span><b>DAÑO</b><strong>{activeEnemy.stats.damage.modifier >= 0 ? '+' : ''}{activeEnemy.stats.damage.modifier}</strong><small>D6</small></span></div>
+       </aside>}
 
       <aside className="left-rail" aria-label="Estado del personaje">
         {character ? <button type="button" className="portrait" aria-label="Mostrar estadísticas del personaje" aria-expanded={characterStatsOpen} onClick={() => setCharacterStatsOpen((open) => !open)}><span>✧</span></button> : <div className="portrait"><span>✧</span></div>}
@@ -416,18 +441,18 @@ function App() {
         <div className="level">LVL<br /><b>{mvp?.level ?? 1}</b></div>
       </aside>
 
-      <section key={activeZoneId} className="location-card title-reveal" aria-labelledby="location-title"><span className="eyebrow">REGIÓN {activeZoneId === 'ashen-courtyard' ? '02' : '01'} / {activeZoneId === 'ashen-courtyard' ? 'PATIO DE CENIZA' : 'RUINAS BAJAS'}</span><h1 id="location-title">{activeZoneId === 'ashen-courtyard' ? 'El Patio de Ceniza' : cryptOfLunargenta.title}</h1><p>{activeZoneId === 'ashen-courtyard' ? 'Donde las brasas guardan el siguiente umbral.' : 'Donde la piedra recuerda cada nombre.'}</p></section>
+      <section key={activeZoneId} className="location-card title-reveal" aria-labelledby="location-title"><span className="eyebrow">REGIÓN {String(campaignLevels.findIndex((level) => level.id === activeLevel.id) + 1).padStart(2, '0')} / {activeLevel.title.toUpperCase()}</span><h1 id="location-title">{activeLevel.title}</h1><p>Explora este nivel y descubre sus rutas.</p></section>
 
       <section className="narrative-panel" aria-labelledby="narrative-title">
         <div className="panel-label panel-header"><span id="narrative-title">✧ REGISTRO DE VIAJE</span><button className="history-toggle" type="button" aria-expanded={historyOpen} onClick={() => setHistoryOpen((open) => !open)}>{historyOpen ? 'OCULTAR' : 'HISTORIAL'}</button></div>
          <div ref={storyLogRef} className="story-log">{visibleLog.slice(-10).map((entry, index) => { const recent = index >= Math.max(0, visibleLog.slice(-10).length - 3); return <p key={`${entry.timestamp}-${entry.text}-${index}`} className={`${entry.tone ?? ''}${recent ? ' recent' : ''}`}><span>{entry.speaker}<time>{new Date(entry.timestamp).toLocaleTimeString('es-ES')}</time></span>{entry.text}</p> })}</div>
          {mvp && <div className="campaign-in-log" aria-label="Registro de campaña">
             {mvp.encounter.status === 'active' && <div className="turn-status" aria-live="polite">{mvp.encounter.awaitingRoll ? 'LANZA EL D20' : mvp.encounter.turn === 'enemy' ? 'TURNO DEL ENEMIGO' : 'TU TURNO'}</div>}
-            <div className="campaign-tabs"><button type="button" className={mvp.zoneId === 'crypt-of-lunargenta' ? 'active' : ''} onClick={() => performMvpAction({ type: 'travel', zoneId: 'crypt-of-lunargenta' })}>CRIPTA</button><button type="button" className={mvp.zoneId === 'ashen-courtyard' ? 'active' : ''} onClick={() => performMvpAction({ type: 'travel', zoneId: 'ashen-courtyard' })}>PATIO</button></div>
-            {nearIria && <div className="campaign-actions"><button type="button" onClick={() => performMvpAction({ type: 'talk-npc' })}>Hablar con Iria</button></div>}
-            {nearRelic && <div className="campaign-actions"><button type="button" onClick={() => performMvpAction({ type: 'inspect-relic' })}>Inspeccionar la reliquia</button></div>}
-            {nearEnemy && <div className="campaign-actions"><button type="button" onClick={() => performMvpAction({ type: 'start-encounter' })} disabled={mvp.encounter.status === 'active'}>Enfrentar al centinela</button>{mvp.encounter.status === 'defeat' && <button type="button" onClick={() => performMvpAction({ type: 'reset-encounter' })}>Reintentar encuentro</button>}</div>}
-            {mvp.encounter.status === 'active' && <div className="enemy-health"><span>CENTINELA {mvp.encounter.enemyHp}/{mvp.encounter.enemyMaxHp}</span><i style={{ '--fill': `${(mvp.encounter.enemyHp / mvp.encounter.enemyMaxHp) * 100}%` } as CSSProperties} /></div>}
+             <div className="campaign-tabs">{campaignLevels.map((level) => <button key={level.id} type="button" className={mvp.zoneId === level.id ? 'active' : ''} onClick={() => performMvpAction({ type: 'travel', zoneId: level.id })}>{level.title}</button>)}</div>
+              {nearNpc && activeNpc && <div className="campaign-actions"><button type="button" onClick={() => performMvpAction({ type: 'talk-npc' })}>{activeLevel.actions.find((item) => item.id === 'talk-npc')?.label ?? activeNpc.name}</button>{mvp.npcTrust > 0 && mvp.routeChoice === null && activeLevel.routeChoices?.map((route) => <button key={route.id} type="button" onClick={() => performMvpAction({ type: 'choose-route', route: route.id as 'relic' | 'direct' })}>{route.label}</button>)}</div>}
+             {nearRelic && <div className="campaign-actions"><button type="button" onClick={() => performMvpAction({ type: 'inspect-relic' })}>{activeLevel.actions.find((item) => item.id === 'inspect-relic')?.label ?? activeRelic?.name}</button></div>}
+              {nearEnemy && activeEnemy && <div className="campaign-actions"><button type="button" onClick={() => performMvpAction({ type: 'start-encounter' })} disabled={mvp.encounter.status === 'active'}>{activeLevel.actions.find((item) => item.id === 'start-encounter')?.label ?? activeEnemy.name}</button>{mvp.encounter.status === 'active' && <button type="button" onClick={() => performMvpAction({ type: 'retreat' })}>Retirarse</button>}{mvp.encounter.status === 'defeat' && <button type="button" onClick={() => performMvpAction({ type: 'reset-encounter' })}>Reintentar encuentro</button>}</div>}
+             {mvp.encounter.status === 'active' && activeEnemy && <div className="enemy-health"><span>{activeEnemy.name.toUpperCase()} {mvp.encounter.enemyHp}/{mvp.encounter.enemyMaxHp}</span><i style={{ '--fill': `${(mvp.encounter.enemyHp / mvp.encounter.enemyMaxHp) * 100}%` } as CSSProperties} /></div>}
          </div>}
         {interactionLabel && <div className={`interaction-prompt${contextualActions.length === 0 ? ' unavailable' : ''}`}><span>{interactionLabel}</span>{interactionMessage}</div>}
         <div className="action-suggestions">{contextualActions.map((item) => <button key={item.id} onClick={() => chooseAction(item.id)}>{item.label}<span>↗</span></button>)}</div>
@@ -438,9 +463,9 @@ function App() {
        </section>
 
        <section className="inventory-bar" aria-label="Inventario">
-         <span className="inventory-label">INVENTARIO</span>
+          <span className="inventory-label">INVENTARIO <small>{mvp?.inventory.reduce((total, item) => total + item.quantity, 0) ?? 0}/{mvp?.inventoryCapacity ?? 12}</small></span>
          <div className="inventory-slots">{mvp?.inventory.length ? mvp.inventory.map((item) => <button key={item.id} type="button" className={`inventory-item${inventoryMenuId === item.id ? ' selected' : ''}`} onClick={() => setInventoryMenuId(inventoryMenuId === item.id ? null : item.id)}><b>{item.id === 'moon-potion' ? '✦' : '◇'}</b><span>{item.label}</span><strong>{item.quantity}</strong></button>) : <span className="inventory-empty">Tu mochila está vacía</span>}</div>
-         {inventoryMenuId && mvp && <div className="inventory-menu" role="menu"><strong>{mvp.inventory.find((item) => item.id === inventoryMenuId)?.label}</strong>{inventoryMenuId === 'moon-potion' && <button type="button" onClick={() => performMvpAction({ type: 'use-potion' })} disabled={mvp.encounter.status === 'active'}>Usar</button>}<button type="button" onClick={() => performMvpAction({ type: 'drop-item', itemId: inventoryMenuId })}>Dejar</button></div>}
+          {inventoryMenuId && mvp && <div className="inventory-menu" role="menu"><strong>{mvp.inventory.find((item) => item.id === inventoryMenuId)?.label}</strong>{inventoryMenuId === 'moon-potion' && <button type="button" onClick={() => performMvpAction({ type: 'use-potion' })} disabled={mvp.encounter.status === 'active'}>Usar</button>}{mvp.inventory.find((item) => item.id === inventoryMenuId)?.equippable === true && <button type="button" onClick={() => performMvpAction({ type: 'equip-item', itemId: inventoryMenuId })}>Equipar</button>}<button type="button" onClick={() => performMvpAction({ type: 'drop-item', itemId: inventoryMenuId })}>Dejar</button></div>}
        </section>
 
       {historyOpen && <aside className="history-sidebar" aria-label="Historial completo del viaje">
@@ -450,17 +475,19 @@ function App() {
 
       {menuOpen && <aside id="controls-menu" className="controls-menu" role="dialog" aria-modal="true" aria-labelledby="controls-menu-title">
         <div className="controls-menu-header"><h2 id="controls-menu-title">CONTROLES</h2><button ref={menuCloseRef} type="button" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú de controles">×</button></div>
-        <p>Explora la cripta y observa sus señales.</p><small className="session-status">ESTADO: {session.status.toUpperCase()}</small>
+         <p>Explora el nivel y observa sus señales.</p><small className="session-status">ESTADO: {session.status.toUpperCase()}</small>
         <ul>
           <li><b>WASD</b><span>Mover</span></li>
            <li><b>ARRASTRAR</b><span>Rotar cámara</span></li>
            <li><b>RUEDA</b><span>Acercar o alejar</span></li>
          </ul>
          <button className="reset-game-button" type="button" onClick={startNewCharacter}>Crear otro personaje</button>
-         <button className="reset-game-button" type="button" onClick={resetGame}>Reiniciar partida</button>
+          <button className="reset-game-button" type="button" onClick={saveGame}>Guardar partida</button>
+          <small className={`save-status ${saveStatus}`}>{saveStatus === 'saved' ? 'Guardado local confirmado' : saveStatus === 'error' ? 'No se pudo guardar esta partida' : 'Sin guardado manual'}</small>
+          <button className="reset-game-button" type="button" onClick={resetGame}>Reiniciar partida</button>
        </aside>}
 
-       {outcomeVisible && <div className={`outcome-banner ${outcomeType}`} role="status" onClick={() => setDismissedOutcomeKey(outcomeKey)}><button type="button" className="outcome-close" aria-label="Cerrar mensaje" onClick={(event) => { event.stopPropagation(); setDismissedOutcomeKey(outcomeKey) }}>×</button><span>{outcomeType === 'victory' ? 'VICTORIA' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'HAS MUERTO' : 'LA CRIPTA TE RECHAZA' : 'PRUEBA SUPERADA'}</span><p>{outcomeType === 'victory' ? 'Has completado todos los mapas de la campaña.' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'Tu vida llegó a cero. Puedes reintentar el encuentro desde el último punto seguro.' : 'La pista se ha perdido, pero esta historia todavía puede crecer.' : 'La tirada ha superado la dificultad. El altar revela un nuevo camino.'}</p></div>}
+        {outcomeVisible && <div className={`outcome-banner ${outcomeType}`} role="status" onClick={() => setDismissedOutcomeKey(outcomeKey)}><button type="button" className="outcome-close" aria-label="Cerrar mensaje" onClick={(event) => { event.stopPropagation(); setDismissedOutcomeKey(outcomeKey) }}>×</button><span>{outcomeType === 'victory' ? 'VICTORIA' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'HAS MUERTO' : 'EL NIVEL TE RECHAZA' : 'PRUEBA SUPERADA'}</span><p>{outcomeType === 'victory' ? 'Has completado todos los mapas de la campaña.' : outcomeType === 'failure' ? gameState.player.hp === 0 ? 'Tu vida llegó a cero. Puedes reintentar el encuentro desde el último punto seguro.' : 'La pista se ha perdido, pero esta historia todavía puede crecer.' : 'La tirada ha superado la dificultad. El altar revela un nuevo camino.'}</p></div>}
 
        <div className={`dice-widget${pendingCheck ? ' pending' : ''}`}>
          <div className="dice-heading"><span>DADOS</span><b>{displayedRoll !== null ? `D20 · ${displayedRoll}` : 'D20 · LISTO'}</b></div>

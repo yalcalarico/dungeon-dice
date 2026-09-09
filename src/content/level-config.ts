@@ -19,7 +19,7 @@ export type SceneConfig = {
   environment: EnvironmentConfig
 }
 
-export type ObjectType = 'altar' | 'torch' | 'exit-door'
+export type ObjectType = 'altar' | 'torch' | 'exit-door' | 'npc' | 'relic' | 'enemy'
 
 export type LevelObject = {
   id: string
@@ -34,7 +34,7 @@ export type LevelObject = {
 export type Requirement =
   | { nearObject: string }
   | { objectiveCompleted: string }
-  | { flag: string }
+  | { flag: string; value?: boolean }
 
 export type Effect =
   | { setFlag: string }
@@ -47,6 +47,7 @@ export type MovementPolicy = {
 
 export type CheckOutcome = {
   effects: Effect[]
+  message?: string
   continue?: boolean
   terminal?: 'victory' | 'failure'
 }
@@ -62,6 +63,7 @@ export type LevelCheck = {
   id: string
   label: string
   die: 'd20'
+  ability: 'wisdom' | 'investigation'
   difficulty: number
   blocking?: boolean
   onSuccess: CheckOutcome
@@ -81,6 +83,68 @@ export type LevelAction = {
   check?: string
   effects: Effect[]
   movement: MovementPolicy
+  messages?: { success?: string; unavailable?: string }
+  exclusive?: boolean
+}
+
+export type LevelNpc = {
+  id: string
+  objectId: string
+  name: string
+  dialogueIds: string[]
+}
+
+export type LevelDialogue = {
+  id: string
+  npcId: string
+  minTrust: number
+  text: string
+  nextTrust?: number
+}
+
+export type LevelRewardItem = {
+  id: string
+  label: string
+  quantity: number
+  kind: 'consumable' | 'quest'
+  equippable?: boolean
+}
+
+export type LevelReward = {
+  id: string
+  experience: number
+  item?: LevelRewardItem
+}
+
+export type LevelRelic = {
+  id: string
+  objectId: string
+  name: string
+  rewardIds: string[]
+}
+
+export type EnemyStats = {
+  maxHp: number
+  armorClass: number
+  attackBonus: number
+  damage: { die: 'd6'; modifier: number }
+}
+
+export type LevelEnemy = {
+  id: string
+  objectId: string
+  name: string
+  stats: EnemyStats
+  rewardIds: string[]
+}
+
+export type RouteChoice = {
+  id: string
+  label: string
+  minTrust: number
+  requires: Requirement[]
+  effects: Effect[]
+  rewardIds: string[]
 }
 
 export type LevelConfig = {
@@ -94,4 +158,11 @@ export type LevelConfig = {
   checks: LevelCheck[]
   actions: LevelAction[]
   victory: { requires: Requirement[] }
+  messages?: { unavailableAction?: string }
+  npcs?: LevelNpc[]
+  dialogues?: LevelDialogue[]
+  rewards?: LevelReward[]
+  relics?: LevelRelic[]
+  enemies?: LevelEnemy[]
+  routeChoices?: RouteChoice[]
 }

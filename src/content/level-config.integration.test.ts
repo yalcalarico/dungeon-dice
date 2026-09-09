@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { cryptOfLunargenta } from './index'
+import { ashenCourtyard, cryptOfLunargenta, levelsByZoneId } from './index'
 import { validateLevelConfig } from './level-loader'
 
-const renderableObjectTypes = new Set(['altar', 'torch', 'exit-door'])
+const renderableObjectTypes = new Set(['altar', 'torch', 'exit-door', 'npc', 'relic', 'enemy'])
 
 describe('bundled level content integration', () => {
   it('is valid and has renderable scene geometry', () => {
@@ -33,6 +33,24 @@ describe('bundled level content integration', () => {
         expect(actionIds.has(actionId)).toBe(true)
       }
     }
+  })
+
+  it('keeps every object inside its playable bounds', () => {
+    for (const level of [cryptOfLunargenta, ashenCourtyard]) {
+      const { bounds } = level.scene
+      for (const object of level.objects) {
+        expect(object.position.x, `${level.id}:${object.id} x`).toBeGreaterThanOrEqual(bounds.minX)
+        expect(object.position.x, `${level.id}:${object.id} x`).toBeLessThanOrEqual(bounds.maxX)
+        expect(object.position.z, `${level.id}:${object.id} z`).toBeGreaterThanOrEqual(bounds.minZ)
+        expect(object.position.z, `${level.id}:${object.id} z`).toBeLessThanOrEqual(bounds.maxZ)
+      }
+    }
+  })
+
+  it('indexes both bundled zones by their stable zone ID', () => {
+    expect(levelsByZoneId['crypt-of-lunargenta']).toBe(cryptOfLunargenta)
+    expect(levelsByZoneId['ashen-courtyard']).toBe(ashenCourtyard)
+    expect(Object.keys(levelsByZoneId)).toEqual(['crypt-of-lunargenta', 'ashen-courtyard'])
   })
 
   it('can reach completion flags for every blocking objective', () => {
